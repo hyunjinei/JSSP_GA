@@ -57,7 +57,7 @@ def run_ga_engine(ga_engine, index, elite=None):
     except Exception as e:
         print(f"Exception in GA {index+1}: {e}")
         return None
-
+## 반가워
 def main():
     dataset = Dataset('test_33.txt')
     config = Run_Config(n_job=3, n_machine=3, n_op=9, population_size=50, generations=10, 
