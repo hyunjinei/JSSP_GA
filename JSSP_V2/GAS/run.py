@@ -44,7 +44,7 @@ from postprocessing.PostProcessing import generate_machine_log  # 수정된 부�
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-TARGET_MAKESPAN = 83  # 목표 Makespan
+TARGET_MAKESPAN = 84  # 목표 Makespan
 MIGRATION_FREQUENCY = 4  # Migration frequency 설정
 
 # GA 엔진 실행 함수
@@ -57,7 +57,7 @@ def run_ga_engine(ga_engine, index, elite=None):
     except Exception as e:
         print(f"Exception in GA {index+1}: {e}")
         return None
-## 반가워
+
 def main():
     dataset = Dataset('test_33.txt')
     config = Run_Config(n_job=3, n_machine=3, n_op=9, population_size=50, generations=10, 

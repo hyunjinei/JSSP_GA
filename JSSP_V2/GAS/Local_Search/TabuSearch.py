@@ -1,6 +1,6 @@
 import copy
 from collections import deque
-import random
+from GAS.Individual import Individual
 
 class TabuSearch:
     def __init__(self, tabu_size=10, max_iter=100, no_improve_limit=20):
@@ -21,7 +21,7 @@ class TabuSearch:
         no_improve_count = 0
 
         for iteration in range(self.max_iter):
-            neighbors = self.get_neighbors(current_solution, config)
+            neighbors = self.get_neighbors(current_solution, config.target_makespan)
             neighbors = [n for n in neighbors if n.seq not in tabu_list or n.fitness < best_fitness]  # Aspiration Criteria
 
             if not neighbors:
@@ -42,29 +42,18 @@ class TabuSearch:
                 print(f"Iteration {iteration}: No improvement (current best: {best_fitness})")
 
             if no_improve_count >= self.no_improve_limit:
-                print(f"No improvement limit reached at iteration {iteration}. Restarting with a new random solution.")
-                current_solution = self.get_random_solution(config.op_data)
-                no_improve_count = 0
-                tabu_list.clear()
+                print(f"No improvement limit reached at iteration {iteration}. Ending Tabu Search.")
+                break
 
         print("Tabu Search 종료")
         return best_solution
 
-    def get_neighbors(self, solution, config):
+    def get_neighbors(self, solution, target_makespan):
         neighbors = []
         for i in range(len(solution.seq)):
             for j in range(i + 1, len(solution.seq)):
                 neighbor = copy.deepcopy(solution)
                 neighbor.seq[i], neighbor.seq[j] = neighbor.seq[j], neighbor.seq[i]
-                neighbor.calculate_fitness(config.target_makespan)  # Ensure fitness is recalculated for neighbors
+                neighbor.calculate_fitness(target_makespan)  # Ensure fitness is recalculated for neighbors
                 neighbors.append(neighbor)
         return neighbors
-
-    def get_random_solution(self, op_data):
-        # Implement a method to generate a random solution
-        # This function should return an individual with a random sequence
-        random_solution = copy.deepcopy(op_data)
-        random.shuffle(random_solution)
-        individual = Individual(seq=random_solution, op_data=op_data)
-        individual.calculate_fitness(config.target_makespan)
-        return individual
