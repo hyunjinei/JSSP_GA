@@ -14,7 +14,7 @@ import numpy as np
 
 
 # 정렬 함수 정의
-def custom_sort(num_list):
+def custom_sort(num_list): # mio솔루션
     return sorted(num_list, key=lambda x: (x % 15, x // 15))
 
 

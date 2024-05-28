@@ -11,48 +11,17 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from GAS.Population import Population
 from Local_Search.TabuSearch import TabuSearch
 
-# migrate_top_10_percent 함수 정의
-def migrate_top_10_percent(ga_engines, migration_order, island_mode):
-    num_islands = len(ga_engines)
-    for source_island_idx in range(num_islands):
-        if island_mode == '2':  # Sequential Migration
-            target_island_idx = (source_island_idx + 1) % num_islands
-        elif island_mode == '3':  # Random Migration
-            target_island_idx = migration_order[source_island_idx]
-
-        source_island = ga_engines[source_island_idx]
-        target_island = ga_engines[target_island_idx]
-
-        print(f"Selected source island {source_island_idx + 1} and target island {target_island_idx + 1}")
-
-        # 상위 10% 개체를 찾기
-        top_10_percent = sorted(source_island.population.individuals, key=lambda ind: ind.fitness, reverse=True)[:max(1, len(source_island.population.individuals) // 10)]
-
-        print(f"Top 10% individuals selected from island {source_island_idx + 1}")
-
-        # 대상 섬에서 무작위 개체와 교체
-        for best_individual in top_10_percent:
-            replacement_idx = random.randint(0, len(target_island.population.individuals) - 1)
-            print(f"Replacing individual at index {replacement_idx} on island {target_island_idx + 1} with an individual from island {source_island_idx + 1}")
-            target_island.population.individuals[replacement_idx] = copy.deepcopy(best_individual)
-
-        print(f"Migrating top 10% individuals from Island {source_island_idx + 1} to Island {target_island_idx + 1}")
-
-
 class GAEngine:
-    def __init__(self, config, op_data, crossover, mutation, selection, local_search, elite_ratio=0.1, ga_engines=None, island_mode=None, migration_frequency=None):
+    def __init__(self, config, op_data, crossover, mutation, selection, local_search=None, elite_ratio=0.1):
         self.config = config
         self.op_data = op_data
         self.crossover = crossover
         self.mutation = mutation
         self.selection = selection
         self.local_search = local_search
-        self.elite_ratio = elite_ratio
         self.population = Population(config, op_data)
+        self.elite_ratio = elite_ratio
         self.best_time = None
-        self.ga_engines = ga_engines
-        self.island_mode = island_mode
-        self.migration_frequency = migration_frequency
 
     def evolve(self):
         try:
@@ -96,19 +65,6 @@ class GAEngine:
                 generation_data = [(ind.seq, ind.makespan) for ind in self.population.individuals]
                 all_generations.append((generation, generation_data))
 
-                # Migration 수행
-                if self.migration_frequency and (generation + 1) % self.migration_frequency == 0 and self.ga_engines:
-                    print(f"Preparing for migration at generation {generation + 1}")
-                    if self.island_mode == '2':
-                        print(f"Migration 중 (순차) at generation {generation + 1}")
-                        migration_order = list(range(len(self.ga_engines)))
-                        migrate_top_10_percent(self.ga_engines, migration_order, self.island_mode)
-                    elif self.island_mode == '3':
-                        print(f"Migration 중 (랜덤) at generation {generation + 1}")
-                        migration_order = random.sample(range(len(self.ga_engines)), len(self.ga_engines))
-                        migrate_top_10_percent(self.ga_engines, migration_order, self.island_mode)
-
-
                 # 목표 Makespan에 도달하면 멈춤
                 if best_individual.makespan <= self.config.target_makespan:
                     print(f"Stopping early as best makespan {best_individual.makespan} is below target {self.config.target_makespan}.")
@@ -127,7 +83,6 @@ class GAEngine:
             print(f"Exception during evolution: {e}")
             return None, None, None, [], 0, None
 
-
     def save_csv(self, all_generations, execution_time, file_path):
         with open(file_path, 'w', newline='') as csvfile:
             csvwriter = csv.writer(csvfile)
@@ -138,3 +93,4 @@ class GAEngine:
                     csvwriter.writerow([generation, ' -> '.join(map(str, chromosome)), makespan])
             
             csvwriter.writerow(['Execution Time', '', execution_time])
+            

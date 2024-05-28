@@ -23,11 +23,11 @@ class Population:
         if max_fitness - min_fitness > 0:
             for individual in self.individuals:
                 individual.scaled_fitness = (individual.fitness - min_fitness) / (max_fitness - min_fitness)
-                print(f"Scaled fitness: {individual.scaled_fitness}, Makespan: {individual.makespan}")
+                # print(f"Scaled fitness: {individual.scaled_fitness}, Makespan: {individual.makespan}")
         else:
             for individual in self.individuals:
                 individual.scaled_fitness = 1.0  # In case all fitness values are the same
-                print(f"Scaled fitness: {individual.scaled_fitness}, Makespan: {individual.makespan}")
+                # print(f"Scaled fitness: {individual.scaled_fitness}, Makespan: {individual.makespan}")
 
     '''
     fit 수정본
@@ -88,4 +88,8 @@ class Population:
             mutation.mutate(individual)
 
     def preserve_elites(self, elites):
-        self.individuals[:len(elites)] = elites            
+        self.individuals[:len(elites)] = elites
+
+    # GA.py의 migrate_top_10_percent 함수때문에 추가.        
+    def __len__(self):
+        return len(self.individuals)                    
