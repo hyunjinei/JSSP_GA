@@ -4,10 +4,11 @@ Process의 병렬처리가 불가능해 JSSP 문제에만 활용 가능합니다
 
 `machine_input_order` 인코딩 방식의 메타휴리스틱 최적화 권장
 
-# 파일 실행 순서
-1. data.py에 데이터 연결
-2. config.py에서 여러가지 시뮬레이션 관련 변수 설정
-3. test_main.py 나 main.py 실행
+# 파일 실행
+1. GAS 폴더로 이동
+2. run.py 실행
+3. 초기화 선택(1. basic 2. Use MIO)
+4. Island 선택(1. 독립 2. 연속적 이동 3. 랜덤 이동)
 
 # Executable Files
 
