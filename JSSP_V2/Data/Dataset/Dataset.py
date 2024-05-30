@@ -3,7 +3,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pandas as pd
-from GAS.Individual import Individual  # GA_pyGAD 대신 GAS 모듈 사용
+from GAS.Individual import Individual  
 # class Solution():
 
 class Dataset:

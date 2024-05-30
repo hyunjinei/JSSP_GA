@@ -34,6 +34,7 @@ class Run_Config:
 
         self.population_size = population_size
         self.generations = generations
+        self.dataset_filename = None  # 새로운 속성 추가
 
 
         script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Get the directory of the current script

@@ -8,15 +8,15 @@ from GAS.Mutation.base import Mutation
 from GAS.Individual import Individual
 
 
+# Mutation/GeneralMutation.py
 class GeneralMutation:
     def __init__(self, pm):
         self.pm = pm
 
     def mutate(self, individual):
-        for i in range(len(individual.seq)):
+        seq = individual.seq[:]
+        for i in range(len(seq)):
             if random.random() < self.pm:
-                j = random.randint(0, len(individual.seq) - 1)
-                individual.seq[i], individual.seq[j] = individual.seq[j], individual.seq[i]
-        individual.makespan, individual.mio_score = individual.evaluate(individual.get_machine_order())
-        individual.calculate_fitness()
-        return individual
+                j = random.randint(0, len(seq) - 1)
+                seq[i], seq[j] = seq[j], seq[i]
+        return Individual(config=individual.config, seq=seq, op_data=individual.op_data)

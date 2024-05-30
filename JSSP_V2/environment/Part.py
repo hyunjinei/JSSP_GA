@@ -28,7 +28,6 @@ class Operation(object):
             # you can handle events using Simpy.AllOf() or Simpy.AnyOf()
             self.requirements = [env.event() for i in range(5)]  # This is an arbitrary value
 
-
 # endregion
 
 # region Job

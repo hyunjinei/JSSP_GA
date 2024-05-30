@@ -108,7 +108,7 @@ class Individual:
         sequence_ = np.array(self.seq)
         for i in range(self.config.n_job):
             idx = np.where((sequence_ >= cumul) & (sequence_ < cumul + self.config.n_machine))[0]
-            for j in range(self.config.n_machine):
+            for j in range(min(len(idx), self.config.n_machine)):
                 sequence_[idx[j]] = temp
                 temp += 1
             cumul += self.config.n_machine
@@ -160,4 +160,3 @@ class Individual:
 
         mio_score = np.sum(np.abs(np.subtract(np.array(mio), np.array(sorted(mio)))))
         return model['Sink'].last_arrival, mio_score
-

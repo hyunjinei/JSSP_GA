@@ -44,7 +44,7 @@ from postprocessing.PostProcessing import generate_machine_log  # 수정된 부�
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-TARGET_MAKESPAN = 83  # 목표 Makespan
+TARGET_MAKESPAN = 1234  # 목표 Makespan
 MIGRATION_FREQUENCY = 4  # Migration frequency 설정
 
 # GA 엔진 실행 함수
@@ -60,14 +60,22 @@ def run_ga_engine(ga_engine, index, elite=None):
 
    
 def main():
+    initialization_mode = input("Select Initialization GA mode (1: basic, 2: MIO): ")
+    print(f"Selected Initialization GA mode: {initialization_mode}")
+    
     island_mode = input("Select Island-Parallel GA mode (1: Independent, 2: Sequential Migration, 3: Random Migration): ")
     print(f"Selected Island-Parallel GA mode: {island_mode}")
-        
-    dataset = Dataset('test_33.txt')
-    config = Run_Config(n_job=3, n_machine=3, n_op=9, population_size=50, generations=10, 
+
+    file = 'abz5.txt'
+
+    dataset = Dataset(file)
+    config = Run_Config(n_job=10, n_machine=10, n_op=100, population_size=20, generations=10, 
                         print_console=False, save_log=True, save_machinelog=True, 
                         show_gantt=False, save_gantt=True, show_gui=False,
                         trace_object='Process4', title='Gantt Chart for JSSP')
+
+    config.dataset_filename = file  # dataset 파일명 설정
+
 
     config.target_makespan = TARGET_MAKESPAN
     config.island_mode = island_mode  # Add this line to set island_mode
@@ -111,19 +119,19 @@ def main():
 
 
     custom_settings = [
-        # {'crossover': PMXCrossover, 'pc': 0.3, 'mutation': DisplacementMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': SimulatedAnnealing()},
-        {'crossover': LOXCrossover, 'pc': 0.4, 'mutation': InsertionMutation, 'pm': 0.6, 'selection': SeedSelection(), 'local_search': None},
-        {'crossover': OBC, 'pc': 0.5, 'mutation': ReciprocalExchangeMutation, 'pm': 0.7, 'selection': TournamentSelection(), 'local_search': None}
-        # {'crossover': OBC, 'pc': 0.6, 'mutation': ReciprocalExchangeMutation, 'pm': 0.9, 'selection': TournamentSelection(), 'local_search': HillClimbing()},
-        # {'crossover': OBC, 'pc': 0.7, 'mutation': ReciprocalExchangeMutation, 'pm': 0.9, 'selection': TournamentSelection(), 'local_search': TabuSearch()},
-        # {'crossover': OBC, 'pc': 0.6, 'mutation': ReciprocalExchangeMutation, 'pm': 0.9, 'selection': SeedSelection(), 'local_search': SimulatedAnnealing()},
-        # {'crossover': OBC, 'pc': 0.6, 'mutation': ReciprocalExchangeMutation, 'pm': 0.9, 'selection': TournamentSelection(), 'local_search': TabuSearch()},
-        # {'crossover': PositionBasedCrossover, 'pc': 0.8, 'mutation': ShiftMutation, 'pm': 0.9, 'selection': SeedSelection(), 'local_search': None},
-        # {'crossover': PSXCrossover, 'pc': 0.6, 'mutation': InversionMutation, 'pm': 0.9, 'selection': TournamentSelection(), 'local_search': TabuSearch()},
-        # {'crossover': OrderCrossover, 'pc': 0.9, 'mutation': InversionMutation, 'pm': 0.8, 'selection': TournamentSelection(), 'local_search': None},
-        # {'crossover': PMXCrossover, 'pc': 0.2, 'mutation': DisplacementMutation, 'pm': 0.8, 'selection': SeedSelection(), 'local_search': TabuSearch()},
-        # {'crossover': PositionBasedCrossover, 'pc': 0.6, 'mutation': ReciprocalExchangeMutation, 'pm': 0.8, 'selection': RouletteSelection(), 'local_search': None},
-        # {'crossover': CXCrossover, 'pc': 0.6, 'mutation': InsertionMutation, 'pm': 0.8, 'selection': RouletteSelection(), 'local_search': None}
+        # {'crossover': PMXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': HillClimbing()},
+        {'crossover': PMXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': SimulatedAnnealing()},
+        # {'crossover': PMXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': TabuSearch()},
+        # {'crossover': PMXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': None},
+        # {'crossover': PMXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': None},
+        # {'crossover': PMXCrossover, 'pc': 0.6, 'mutation': InversionMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': None},
+        # {'crossover': PMXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': None},
+        # {'crossover': PMXCrossover, 'pc': 0.8, 'mutation': InversionMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': None},
+        # {'crossover': PMXCrossover, 'pc': 0.9, 'mutation': InversionMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': None},
+        # {'crossover': PMXCrossover, 'pc': 1.0, 'mutation': InversionMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': None}
+        # {'crossover': PMXCrossover, 'pc': 0.4, 'mutation': DisplacementMutation, 'pm': 0.8, 'selection': RouletteSelection(), 'local_search': None},
+        # {'crossover': PMXCrossover, 'pc': 0.5, 'mutation': ReciprocalExchangeMutation, 'pm': 0.8, 'selection': RouletteSelection(), 'local_search': None},
+        # {'crossover': PMXCrossover, 'pc': 0.6, 'mutation': InsertionMutation, 'pm': 0.8, 'selection': RouletteSelection(), 'local_search': None}
     ]
 
     ga_engines = []
@@ -139,11 +147,11 @@ def main():
         mutation = mutation_class(pm=pm)
         selection = selection_instance
         local_search = local_search_class if local_search_class else None
-        # ga_engiens 기존
-        # ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, elite_ratio=0.1))
         
-        # ga_engiens 변경
-        ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, elite_ratio=0.1, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY))
+        if initialization_mode == '1':
+            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, elite_ratio=0.1, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY))
+        else:
+            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, elite_ratio=0.1, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, initialization_mode='2', dataset_filename=config.dataset_filename))
 
     best_individuals = [None] * len(ga_engines)  # Indexing issue fix
     stop_evolution = False

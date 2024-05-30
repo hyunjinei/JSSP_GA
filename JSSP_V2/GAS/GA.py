@@ -10,6 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from GAS.Population import Population
 from Local_Search.TabuSearch import TabuSearch
+from Data.Dataset.Dataset import Dataset
 
 # migrate_top_10_percent 함수 정의
 def migrate_top_10_percent(ga_engines, migration_order, island_mode):
@@ -40,7 +41,7 @@ def migrate_top_10_percent(ga_engines, migration_order, island_mode):
 
 
 class GAEngine:
-    def __init__(self, config, op_data, crossover, mutation, selection, local_search, elite_ratio=0.1, ga_engines=None, island_mode=None, migration_frequency=None):
+    def __init__(self, config, op_data, crossover, mutation, selection, local_search, elite_ratio=0.1, ga_engines=None, island_mode=1, migration_frequency=10, initialization_mode='1', dataset_filename=None):
         self.config = config
         self.op_data = op_data
         self.crossover = crossover
@@ -53,6 +54,14 @@ class GAEngine:
         self.ga_engines = ga_engines
         self.island_mode = island_mode
         self.migration_frequency = migration_frequency
+        self.dataset_filename = dataset_filename  # 새로운 인자 추가
+
+        if initialization_mode == '2':
+            self.population = Population.from_mio(config, op_data, dataset_filename)
+        else:
+            self.population = Population(config, op_data)
+
+
 
     def evolve(self):
         try:
