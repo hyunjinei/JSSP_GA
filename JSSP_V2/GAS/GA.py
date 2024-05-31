@@ -11,6 +11,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from GAS.Population import Population
 from Local_Search.TabuSearch import TabuSearch
 from Data.Dataset.Dataset import Dataset
+from Meta.PSO import PSO  # pso를 추가합니다
+from GAS.Mutation.SelectiveMutation import SelectiveMutation
 
 # migrate_top_10_percent 함수 정의
 def migrate_top_10_percent(ga_engines, migration_order, island_mode):
@@ -41,13 +43,15 @@ def migrate_top_10_percent(ga_engines, migration_order, island_mode):
 
 
 class GAEngine:
-    def __init__(self, config, op_data, crossover, mutation, selection, local_search, elite_ratio=0.1, ga_engines=None, island_mode=1, migration_frequency=10, initialization_mode='1', dataset_filename=None):
+    def __init__(self, config, op_data, crossover, mutation, selection, local_search=None, pso=None, selective_mutation=None, elite_ratio=0.1, ga_engines=None, island_mode=1, migration_frequency=10, initialization_mode='1', dataset_filename=None):
         self.config = config
         self.op_data = op_data
         self.crossover = crossover
         self.mutation = mutation
         self.selection = selection
         self.local_search = local_search
+        self.pso = pso  # PSO 추가
+        self.selective_mutation = selective_mutation  # SelectiveMutation 추가
         self.elite_ratio = elite_ratio
         self.population = Population(config, op_data)
         self.best_time = None
@@ -80,14 +84,34 @@ class GAEngine:
 
                 self.population.select(self.selection)
                 self.population.crossover(self.crossover)
+                # Before mutation, print population
+                # print(f"Before mutation, population sequences: {[ind.seq for ind in self.population.individuals]}")
+
                 self.population.mutate(self.mutation)
 
+                # After mutation, print population
+                # print(f"After mutation, population sequences: {[ind.seq for ind in self.population.individuals]}")
+
+                # Apply PSO to each individual in the population
+                if self.pso:
+                    print("PSO 시작")
+                    for i in range(len(self.population.individuals)):
+                        optimized_ind = self.pso.optimize(self.population.individuals[i], self.config)
+                        self.population.individuals[i] = optimized_ind
+                        
                 # Apply local search to each individual in the population
                 if self.local_search:
                     print("Local Search 시작")
                     for i in range(len(self.population.individuals)):
                         optimized_ind = self.local_search.optimize(self.population.individuals[i], self.config)
                         self.population.individuals[i] = optimized_ind
+
+                # # Apply PSO to each individual in the population
+                # if self.pso:
+                #     print("PSO 시작")
+                #     for i in range(len(self.population.individuals)):
+                #         optimized_ind = self.pso.optimize(self.population.individuals[i], self.config)
+                #         self.population.individuals[i] = optimized_ind
 
                 # Elitism: 최상의 해를 새로운 Population에 추가합니다.
                 self.population.individuals[:num_elites] = elites

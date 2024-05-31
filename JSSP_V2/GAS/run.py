@@ -37,6 +37,12 @@ from Local_Search.TabuSearch import TabuSearch
 from Local_Search.SimulatedAnnealing import SimulatedAnnealing
 from Local_Search.GifflerThompson import GifflerThompson
 
+# Meta Heuristic
+from Meta.PSO import PSO  # pso를 추가합니다
+
+# 선택 mutation 
+from GAS.Mutation.SelectiveMutation import SelectiveMutation
+
 from Config.Run_Config import Run_Config
 from Data.Dataset.Dataset import Dataset
 from visualization.Gantt import Gantt
@@ -58,7 +64,6 @@ def run_ga_engine(ga_engine, index, elite=None):
         print(f"Exception in GA {index+1}: {e}")
         return None
 
-   
 def main():
     initialization_mode = input("Select Initialization GA mode (1: basic, 2: MIO): ")
     print(f"Selected Initialization GA mode: {initialization_mode}")
@@ -69,13 +74,12 @@ def main():
     file = 'abz5.txt'
 
     dataset = Dataset(file)
-    config = Run_Config(n_job=10, n_machine=10, n_op=100, population_size=20, generations=10, 
+    config = Run_Config(n_job=10, n_machine=10, n_op=100, population_size=200, generations=200, 
                         print_console=False, save_log=True, save_machinelog=True, 
                         show_gantt=False, save_gantt=True, show_gui=False,
                         trace_object='Process4', title='Gantt Chart for JSSP')
-
+                        
     config.dataset_filename = file  # dataset 파일명 설정
-
 
     config.target_makespan = TARGET_MAKESPAN
     config.island_mode = island_mode  # Add this line to set island_mode
@@ -117,21 +121,26 @@ def main():
     GifflerThompson(priority_rule='SPT') -> SPT, LPT, MWR, LWR, MOR, LOR, EDD, FCFS, RANDOM
     '''
 
+    '''
+    Meta Heuristic
+    ['pso': PSO(num_particles=10, num_iterations=50)], 'pso': None  # PSO 추가
+    '''
 
     custom_settings = [
-        # {'crossover': PMXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': HillClimbing()},
-        {'crossover': PMXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': SimulatedAnnealing()},
-        # {'crossover': PMXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': TabuSearch()},
-        # {'crossover': PMXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': None},
-        # {'crossover': PMXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': None},
-        # {'crossover': PMXCrossover, 'pc': 0.6, 'mutation': InversionMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': None},
-        # {'crossover': PMXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': None},
-        # {'crossover': PMXCrossover, 'pc': 0.8, 'mutation': InversionMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': None},
-        # {'crossover': PMXCrossover, 'pc': 0.9, 'mutation': InversionMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': None},
-        # {'crossover': PMXCrossover, 'pc': 1.0, 'mutation': InversionMutation, 'pm': 0.9, 'selection': RouletteSelection(), 'local_search': None}
-        # {'crossover': PMXCrossover, 'pc': 0.4, 'mutation': DisplacementMutation, 'pm': 0.8, 'selection': RouletteSelection(), 'local_search': None},
-        # {'crossover': PMXCrossover, 'pc': 0.5, 'mutation': ReciprocalExchangeMutation, 'pm': 0.8, 'selection': RouletteSelection(), 'local_search': None},
-        # {'crossover': PMXCrossover, 'pc': 0.6, 'mutation': InsertionMutation, 'pm': 0.8, 'selection': RouletteSelection(), 'local_search': None}
+        {'crossover': PMXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': RouletteSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
+        {'crossover': OrderCrossover, 'pc': 0.7, 'mutation': GeneralMutation, 'pm': 0.2, 'selection': TournamentSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
+        {'crossover': LOXCrossover, 'pc': 0.7, 'mutation': DisplacementMutation, 'pm': 0.2, 'selection': RouletteSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
+        {'crossover': OBC, 'pc': 0.7, 'mutation': InsertionMutation, 'pm': 0.2, 'selection': TournamentSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
+        {'crossover': PositionBasedCrossover, 'pc': 0.7, 'mutation': ReciprocalExchangeMutation, 'pm': 0.2, 'selection': SeedSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
+        {'crossover': SXX, 'pc': 0.7, 'mutation': ShiftMutation, 'pm': 0.2, 'selection': SeedSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
+        {'crossover': PSXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': RouletteSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
+        {'crossover': PMXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': TournamentSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
+        {'crossover': OrderCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': TournamentSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
+        {'crossover': LOXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': SeedSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
+        {'crossover': OBC, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': TournamentSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
+        {'crossover': PositionBasedCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': RouletteSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
+        {'crossover': SXX, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': SeedSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
+        {'crossover': PSXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': RouletteSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
     ]
 
     ga_engines = []
@@ -140,6 +149,8 @@ def main():
         mutation_class = setting['mutation']
         selection_instance = setting['selection']
         local_search_class = setting['local_search']
+        pso_class = setting.get('pso')  # pso 설정 추가
+        selective_mutation_instance = setting['selective_mutation']  # SelectiveMutation 설정 추가 
         pc = setting['pc']
         pm = setting['pm']
 
@@ -147,11 +158,12 @@ def main():
         mutation = mutation_class(pm=pm)
         selection = selection_instance
         local_search = local_search_class if local_search_class else None
+        pso = pso_class if pso_class else None  # pso 인스턴스 생성
         
         if initialization_mode == '1':
-            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, elite_ratio=0.1, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY))
+            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso, elite_ratio=0.1, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY))
         else:
-            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, elite_ratio=0.1, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, initialization_mode='2', dataset_filename=config.dataset_filename))
+            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso, elite_ratio=0.1, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, initialization_mode='2', dataset_filename=config.dataset_filename))
 
     best_individuals = [None] * len(ga_engines)  # Indexing issue fix
     stop_evolution = False
@@ -182,11 +194,12 @@ def main():
                                 mutation_name = best_mutation.__class__.__name__
                                 selection_name = ga_engines[index].selection.__class__.__name__
                                 local_search_name = ga_engines[index].local_search.__class__.__name__ if ga_engines[index].local_search else 'None'
+                                pso_name = ga_engines[index].pso.__class__.__name__ if ga_engines[index].pso else 'None'  # pso 이름 추가
                                 pc = best_crossover.pc
                                 pm = best_mutation.pm
-                                log_path = os.path.join(result_txt_path, f'log_GA{index+1}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_pc{pc}_pm{pm}.csv')
-                                machine_log_path = os.path.join(result_txt_path, f'machine_log_GA{index+1}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_pc{pc}_pm{pm}.csv')
-                                generations_path = os.path.join(ga_generations_path, f'ga_generations_GA{index+1}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_pc{pc}_pm{pm}.csv')
+                                log_path = os.path.join(result_txt_path, f'log_GA{index+1}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_{pso_name}_pc{pc}_pm{pm}.csv')
+                                machine_log_path = os.path.join(result_txt_path, f'machine_log_GA{index+1}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_{pso_name}_pc{pc}_pm{pm}.csv')
+                                generations_path = os.path.join(ga_generations_path, f'ga_generations_GA{index+1}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_{pso_name}_pc{pc}_pm{pm}.csv')
                                 
                                 if best is not None and hasattr(best, 'monitor'):
                                     best.monitor.save_event_tracer(log_path)
@@ -200,7 +213,7 @@ def main():
                                 # 목표 Makespan에 도달하면 멈춤
                                 if best.makespan <= TARGET_MAKESPAN:
                                     stop_evolution = True
-                                    print(f"Stopping early as best makespan {best.makespan} is below target {TARGET_MAKESPAN}.")
+                                    print(f"Stopping early as best makespan {best_individual.makespan} is below target {TARGET_MAKESPAN}.")
                                     break
 
                                 # 모든 파일이 생성된 경우 멈춤
@@ -245,11 +258,12 @@ def main():
                                 mutation_name = best_mutation.__class__.__name__
                                 selection_name = ga_engines[index].selection.__class__.__name__
                                 local_search_name = ga_engines[index].local_search.__class__.__name__ if ga_engines[index].local_search else 'None'
+                                pso_name = ga_engines[index].pso.__class__.__name__ if ga_engines[index].pso else 'None'  # pso 이름 추가
                                 pc = best_crossover.pc
                                 pm = best_mutation.pm
-                                log_path = os.path.join(result_txt_path, f'log_GA{index+1}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_pc{pc}_pm{pm}.csv')
-                                machine_log_path = os.path.join(result_txt_path, f'machine_log_GA{index+1}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_pc{pc}_pm{pm}.csv')
-                                generations_path = os.path.join(ga_generations_path, f'ga_generations_GA{index+1}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_pc{pc}_pm{pm}.csv')
+                                log_path = os.path.join(result_txt_path, f'log_GA{index+1}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_{pso_name}_pc{pc}_pm{pm}.csv')
+                                machine_log_path = os.path.join(result_txt_path, f'machine_log_GA{index+1}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_{pso_name}_pc{pc}_pm{pm}.csv')
+                                generations_path = os.path.join(ga_generations_path, f'ga_generations_GA{index+1}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_{pso_name}_pc{pc}_pm{pm}.csv')
                                 
                                 if best is not None and hasattr(best, 'monitor'):
                                     best.monitor.save_event_tracer(log_path)
@@ -286,11 +300,12 @@ def main():
             mutation_name = best_mutation.__class__.__name__
             selection_name = ga_engines[i].selection.__class__.__name__
             local_search_name = ga_engines[i].local_search.__class__.__name__ if ga_engines[i].local_search else 'None'
+            pso_name = ga_engines[i].pso.__class__.__name__ if ga_engines[i].pso else 'None'  # pso 이름 추가
             pc = best_crossover.pc
             pm = best_mutation.pm
-            print(f"Best solution for GA{i+1}: {best} using {crossover_name} with pc={pc} and {mutation_name} with pm={pm} and selection: {selection_name} and Local Search: {local_search_name}, Time taken: {execution_time:.2f} seconds, First best time: {best_time:.2f} seconds")
-            machine_log_path = os.path.join(result_txt_path, f'machine_log_GA{i+1}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_pc{pc}_pm{pm}.csv')
-            gantt_path = os.path.join(result_gantt_path, f'gantt_chart_GA{i+1}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_pc{pc}_pm{pm}.png')
+            print(f"Best solution for GA{i+1}: {best} using {crossover_name} with pc={pc} and {mutation_name} with pm={pm} and selection: {selection_name} and Local Search: {local_search_name} and pso: {pso_name}, Time taken: {execution_time:.2f} seconds, First best time: {best_time:.2f} seconds")
+            machine_log_path = os.path.join(result_txt_path, f'machine_log_GA{i+1}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_{pso_name}_pc{pc}_pm{pm}.csv')
+            gantt_path = os.path.join(result_gantt_path, f'gantt_chart_GA{i+1}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_{pso_name}_pc{pc}_pm{pm}.png')
             if os.path.exists(machine_log_path):
                 machine_log = pd.read_csv(machine_log_path)
                 config.filename['gantt'] = gantt_path
@@ -300,4 +315,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

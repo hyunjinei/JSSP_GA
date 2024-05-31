@@ -6,7 +6,7 @@ import random
 from GAS.Individual import Individual
 from Data.Dataset.Dataset import Dataset
 
-print_console = True
+print_console = False
 
 class Operation:
     def __init__(self, i, j, machine, n_machine):
@@ -146,7 +146,21 @@ class Population:
         for individual in self.individuals:
             individual.makespan, individual.mio_score = individual.evaluate(individual.machine_order)
             individual.calculate_fitness(target_makespan)
-        # Apply min-max scaling
+            # print(f"Individual: {individual.seq}, Fitness: {individual.fitness}, Makespan: {individual.makespan}")
+            # print(f"Fitness: {individual.fitness}, Makespan: {individual.makespan}")
+        # 스케일링 방법 선택 (Rank Scaling, Sigma Scaling, Boltzmann Scaling)
+        scaling_method = 'min-max'  # 'min-max', 'sigma', 'boltzmann' 등을 사용할 수 있습니다.
+
+        if scaling_method == 'min-max':
+            self.min_max_scaling()
+        elif scaling_method == 'rank':
+            self.rank_scaling()
+        elif scaling_method == 'sigma':
+            self.sigma_scaling()
+        elif scaling_method == 'boltzmann':
+            self.boltzmann_scaling()
+    
+    def min_max_scaling(self):
         fitness_values = [ind.fitness for ind in self.individuals]
         min_fitness = min(fitness_values)
         max_fitness = max(fitness_values)
@@ -154,11 +168,88 @@ class Population:
         if max_fitness - min_fitness > 0:
             for individual in self.individuals:
                 individual.scaled_fitness = (individual.fitness - min_fitness) / (max_fitness - min_fitness)
-                # print(f"Scaled fitness: {individual.scaled_fitness}, Makespan: {individual.makespan}")
+                # print(f"Min-Max Scaled fitness: {individual.scaled_fitness}, Makespan: {individual.makespan}")
         else:
             for individual in self.individuals:
                 individual.scaled_fitness = 1.0  # In case all fitness values are the same
-                # print(f"Scaled fitness: {individual.scaled_fitness}, Makespan: {individual.makespan}")
+                # print(f"Min-Max Scaled fitness: {individual.scaled_fitness}, Makespan: {individual.makespan}")
+
+    def rank_scaling(self):
+        sorted_individuals = sorted(self.individuals, key=lambda ind: ind.fitness, reverse=True)
+        for rank, individual in enumerate(sorted_individuals):
+            individual.scaled_fitness = rank + 1  # 순위를 적합도로 사용
+            # print(f"Rank Scaling - Individual: {individual.seq}, Scaled Fitness: {individual.scaled_fitness}")
+
+    def sigma_scaling(self):
+        fitness_values = [ind.fitness for ind in self.individuals]
+        mean_fitness = np.mean(fitness_values)
+        std_fitness = np.std(fitness_values)
+        
+        for individual in self.individuals:
+            if std_fitness > 0:
+                individual.scaled_fitness = 1 + (individual.fitness - mean_fitness) / (2 * std_fitness)
+            else:
+                individual.scaled_fitness = 1  # 표준편차가 0인 경우
+            # print(f"Sigma Scaling - Individual: {individual.seq}, Scaled Fitness: {individual.scaled_fitness}")
+            # print(f"Makespan: {individual.makespan}")
+
+    def boltzmann_scaling(self, T=1.0):
+        fitness_values = [ind.fitness for ind in self.individuals]
+        exp_values = np.exp(fitness_values / T)
+        sum_exp_values = np.sum(exp_values)
+        
+        for individual in self.individuals:
+            individual.scaled_fitness = exp_values[self.individuals.index(individual)] / sum_exp_values
+            # print(f"Boltzmann Scaling - Individual: {individual.seq}, Scaled Fitness: {individual.scaled_fitness}")            
+            print(f"Makespan: {individual.makespan}")            
+        # # Apply min-max scaling
+        # fitness_values = [ind.fitness for ind in self.individuals]
+        # min_fitness = min(fitness_values)
+        # max_fitness = max(fitness_values)
+
+        # if max_fitness - min_fitness > 0:
+        #     for individual in self.individuals:
+        #         individual.scaled_fitness = (individual.fitness - min_fitness) / (max_fitness - min_fitness)
+        #         # print(f"Scaled fitness: {individual.scaled_fitness}, Makespan: {individual.makespan}")
+        # else:
+        #     for individual in self.individuals:
+        #         individual.scaled_fitness = 1.0  # In case all fitness values are the same
+        #         # print(f"Scaled fitness: {individual.scaled_fitness}, Makespan: {individual.makespan}")
+
+    #     # 스케일링 방법 선택 (Rank Scaling, Sigma Scaling, Boltzmann Scaling)
+    #     scaling_method = 'rank'  # 'sigma', 'boltzmann' 등을 사용할 수 있습니다.
+
+    #     if scaling_method == 'rank':
+    #         self.rank_scaling()
+    #     elif scaling_method == 'sigma':
+    #         self.sigma_scaling()
+    #     elif scaling_method == 'boltzmann':
+    #         self.boltzmann_scaling()
+    
+    # def rank_scaling(self):
+    #     sorted_individuals = sorted(self.individuals, key=lambda ind: ind.fitness, reverse=True)
+    #     for rank, individual in enumerate(sorted_individuals):
+    #         individual.scaled_fitness = rank + 1  # 순위를 적합도로 사용
+
+    # def sigma_scaling(self):
+    #     fitness_values = [ind.fitness for ind in self.individuals]
+    #     mean_fitness = np.mean(fitness_values)
+    #     std_fitness = np.std(fitness_values)
+        
+    #     for individual in self.individuals:
+    #         if std_fitness > 0:
+    #             individual.scaled_fitness = 1 + (individual.fitness - mean_fitness) / (2 * std_fitness)
+    #         else:
+    #             individual.scaled_fitness = 1  # 표준편차가 0인 경우
+
+    # def boltzmann_scaling(self, T=1.0):
+    #     fitness_values = [ind.fitness for ind in self.individuals]
+    #     exp_values = np.exp(fitness_values / T)
+    #     sum_exp_values = np.sum(exp_values)
+        
+    #     for individual in self.individuals:
+    #         individual.scaled_fitness = exp_values[self.individuals.index(individual)] / sum_exp_values
+
 
     def select(self, selection):
         self.individuals = [selection.select(self.individuals) for _ in range(self.config.population_size)]
