@@ -11,7 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from GAS.Population import Population
 from Local_Search.TabuSearch import TabuSearch
 from Data.Dataset.Dataset import Dataset
-from Meta.PSO import PSO  # pso를 추가합니다
+from Meta.PSO import PSO  # PSO를 추가합니다
 from GAS.Mutation.SelectiveMutation import SelectiveMutation
 
 # migrate_top_10_percent 함수 정의
@@ -26,34 +26,25 @@ def migrate_top_10_percent(ga_engines, migration_order, island_mode):
         source_island = ga_engines[source_island_idx]
         target_island = ga_engines[target_island_idx]
 
-        print(f"Selected source island {source_island_idx + 1} and target island {target_island_idx + 1}")
-
         # 상위 10% 개체를 찾기
         top_10_percent = sorted(source_island.population.individuals, key=lambda ind: ind.fitness, reverse=True)[:max(1, len(source_island.population.individuals) // 10)]
-
-        print(f"Top 10% individuals selected from island {source_island_idx + 1}")
 
         # 대상 섬에서 무작위 개체와 교체
         for best_individual in top_10_percent:
             replacement_idx = random.randint(0, len(target_island.population.individuals) - 1)
-            print(f"Replacing individual at index {replacement_idx} on island {target_island_idx + 1} with an individual from island {source_island_idx + 1}")
             target_island.population.individuals[replacement_idx] = copy.deepcopy(best_individual)
 
-        print(f"Migrating top 10% individuals from Island {source_island_idx + 1} to Island {target_island_idx + 1}")
-
-
 class GAEngine:
-    def __init__(self, config, op_data, crossover, mutation, selection, local_search=None, pso=None, selective_mutation=None, elite_ratio=0.1, ga_engines=None, island_mode=1, migration_frequency=10, initialization_mode='1', dataset_filename=None):
+    def __init__(self, config, op_data, crossover, mutation, selection, local_search=None, pso=None, selective_mutation=None, elite_ratio=0.1, ga_engines=None, island_mode=1, migration_frequency=10, initialization_mode='1', dataset_filename=None, initial_population=None):
         self.config = config
         self.op_data = op_data
         self.crossover = crossover
         self.mutation = mutation
         self.selection = selection
-        self.local_search = local_search
+        self.local_search_methods = local_search if local_search else []  # local_search를 리스트로 변경
         self.pso = pso  # PSO 추가
         self.selective_mutation = selective_mutation  # SelectiveMutation 추가
         self.elite_ratio = elite_ratio
-        self.population = Population(config, op_data)
         self.best_time = None
         self.ga_engines = ga_engines
         self.island_mode = island_mode
@@ -62,10 +53,10 @@ class GAEngine:
 
         if initialization_mode == '2':
             self.population = Population.from_mio(config, op_data, dataset_filename)
+        elif initialization_mode == '3':
+            self.population = Population.from_giffler_thompson(config, op_data, dataset_filename)
         else:
             self.population = Population(config, op_data)
-
-
 
     def evolve(self):
         try:
@@ -84,34 +75,17 @@ class GAEngine:
 
                 self.population.select(self.selection)
                 self.population.crossover(self.crossover)
-                # Before mutation, print population
-                # print(f"Before mutation, population sequences: {[ind.seq for ind in self.population.individuals]}")
-
                 self.population.mutate(self.mutation)
 
-                # After mutation, print population
-                # print(f"After mutation, population sequences: {[ind.seq for ind in self.population.individuals]}")
-
-                # Apply PSO to each individual in the population
-                if self.pso:
-                    print("PSO 시작")
-                    for i in range(len(self.population.individuals)):
-                        optimized_ind = self.pso.optimize(self.population.individuals[i], self.config)
-                        self.population.individuals[i] = optimized_ind
-                        
                 # Apply local search to each individual in the population
-                if self.local_search:
-                    print("Local Search 시작")
-                    for i in range(len(self.population.individuals)):
-                        optimized_ind = self.local_search.optimize(self.population.individuals[i], self.config)
-                        self.population.individuals[i] = optimized_ind
-
-                # # Apply PSO to each individual in the population
-                # if self.pso:
-                #     print("PSO 시작")
-                #     for i in range(len(self.population.individuals)):
-                #         optimized_ind = self.pso.optimize(self.population.individuals[i], self.config)
-                #         self.population.individuals[i] = optimized_ind
+                for i in range(len(self.population.individuals)):
+                    individual = self.population.individuals[i]
+                    optimized_ind = self.apply_local_search(individual)
+                    # Local Search 전 염색체, makespan, fitness 출력
+                    print(f"Before Local Search - Individual: {individual.seq}, Makespan: {individual.makespan}, Fitness: {individual.fitness}")
+                    self.population.individuals[i] = optimized_ind
+                    # Local Search 후 염색체, makespan, fitness 출력
+                    print(f"After Local Search - Individual: {optimized_ind.seq}, Makespan: {optimized_ind.makespan}, Fitness: {optimized_ind.fitness}")
 
                 # Elitism: 최상의 해를 새로운 Population에 추가합니다.
                 self.population.individuals[:num_elites] = elites
@@ -141,7 +115,6 @@ class GAEngine:
                         migration_order = random.sample(range(len(self.ga_engines)), len(self.ga_engines))
                         migrate_top_10_percent(self.ga_engines, migration_order, self.island_mode)
 
-
                 # 목표 Makespan에 도달하면 멈춤
                 if best_individual.makespan <= self.config.target_makespan:
                     print(f"Stopping early as best makespan {best_individual.makespan} is below target {self.config.target_makespan}.")
@@ -160,6 +133,13 @@ class GAEngine:
             print(f"Exception during evolution: {e}")
             return None, None, None, [], 0, None
 
+    def apply_local_search(self, individual):
+        best_individual = copy.deepcopy(individual)
+        for method in self.local_search_methods:
+            improved_individual = method.optimize(best_individual, self.config)
+            if improved_individual.makespan < best_individual.makespan:
+                best_individual = improved_individual
+        return best_individual
 
     def save_csv(self, all_generations, execution_time, file_path):
         with open(file_path, 'w', newline='') as csvfile:
@@ -171,3 +151,4 @@ class GAEngine:
                     csvwriter.writerow([generation, ' -> '.join(map(str, chromosome)), makespan])
             
             csvwriter.writerow(['Execution Time', '', execution_time])
+

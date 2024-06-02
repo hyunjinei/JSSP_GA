@@ -32,10 +32,6 @@ class GifflerThompson:
             sorted_seq = sorted(seq, key=lambda x: len([op for op in op_data[x // config.n_machine] if op[1] > 0]))
         elif rule == 'EDD':
             sorted_seq = sorted(seq, key=lambda x: op_data[x // config.n_machine][x % config.n_machine][2])
-        elif rule == 'FCFS':
-            sorted_seq = seq
-        elif rule == 'RANDOM':
-            sorted_seq = random.sample(seq, len(seq))
         else:
             sorted_seq = seq  # Default to no sorting
         return sorted_seq

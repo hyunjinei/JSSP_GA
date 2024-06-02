@@ -68,6 +68,7 @@ class Individual:
         if self.makespan == 0:
             raise ValueError("Makespan is zero, which will cause division by zero error.")
         self.fitness = 1 / (self.makespan / target_makespan)
+        # print(f"Calculated fitness: {self.fitness} for makespan: {self.makespan} and target_makespan: {target_makespan}")
         return self.fitness
         
         
@@ -158,5 +159,10 @@ class Individual:
             self.MIO.append(mio)
             self.MIO_sorted.append(np.sort(mio))
 
+        # mio_score = np.sum(np.abs(np.subtract(np.array(mio), np.array(sorted(mio)))))
+        # return model['Sink'].last_arrival, mio_score
         mio_score = np.sum(np.abs(np.subtract(np.array(mio), np.array(sorted(mio)))))
-        return model['Sink'].last_arrival, mio_score
+        makespan = model['Sink'].last_arrival
+        # print(f"Calculated makespan: {makespan} and mio_score: {mio_score}")
+        return makespan, mio_score        
+            

@@ -1,0 +1,34 @@
+Time,Event,Part,Process,Machine
+0,Part0 Created,Part0_0,Source0,
+0,Part1 Created,Part1_0,Source1,
+0,Part2 Created,Part2_0,Source2,
+0,Part0_0_Routing Start,Part0_0,Source0,
+0,Part1_0_Routing Start,Part1_0,Source1,
+0,Part2_0_Routing Start,Part2_0,Source2,
+0,Part0_0_Routing Finished,Part0_0,Source0,
+0,Part0_0 transferred from Source,Part0_0,Process1,
+0,Part1_0_Routing Finished,Part1_0,Source1,
+0,Part1_0 transferred from Source,Part1_0,Process1,
+0,Part2_0_Routing Finished,Part2_0,Source2,
+0,Part2_0 transferred from Source,Part2_0,Process0,
+0,Started,Part1_0,Process1,M1
+0,Started,Part2_0,Process0,M0
+23,Finished,Part2_0,Process0,M0
+31,Finished,Part1_0,Process1,M1
+31,Started,Part0_0,Process1,M1
+44,Finished,Part0_0,Process1,M1
+44,Started,Part2_0,Process1,M1
+44,Started,Part0_0,Process2,M2
+55,Finished,Part2_0,Process1,M1
+75,Finished,Part0_0,Process2,M2
+75,Started,Part1_0,Process2,M2
+75,Started,Part0_0,Process0,M0
+86,Finished,Part1_0,Process2,M2
+86,Started,Part2_0,Process2,M2
+92,Finished,Part0_0,Process0,M0
+92,Completed,Part0_0,Sink,
+92,Started,Part1_0,Process0,M0
+111,Finished,Part1_0,Process0,M0
+111,Completed,Part1_0,Sink,
+115,Finished,Part2_0,Process2,M2
+115,Completed,Part2_0,Sink,

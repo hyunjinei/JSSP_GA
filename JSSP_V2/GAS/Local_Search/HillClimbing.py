@@ -1,39 +1,45 @@
-# Local_Search/HillClimbing.py
-
 import copy
 
 class HillClimbing:
-    def __init__(self):
-        pass
+    def __init__(self, iterations=100):
+        self.iterations = iterations
 
     def optimize(self, individual, config):
-        print("Hill Climbing 시작")
-        current_solution = copy.deepcopy(individual)
-        current_fitness = current_solution.calculate_fitness(config.target_makespan)  # 수정
+        print(f"Hill Climbing 시작")
+        # print(f"Hill Climbing 시작 - Initial Individual: {individual.seq}, Makespan: {individual.makespan}, Fitness: {individual.fitness}")
+        best_solution = copy.deepcopy(individual)
+        best_makespan = individual.makespan
         iteration = 0
 
-        while True:
-            neighbors = self.get_neighbors(current_solution, config)
-            next_solution = min(neighbors, key=lambda ind: ind.fitness)
+        while iteration < self.iterations:
+            neighbors = self.get_neighbors(best_solution)
+            # print(f"Iteration {iteration + 1} - Number of Neighbors: {len(neighbors)}")
+            current_solution = min(neighbors, key=lambda ind: ind.makespan)
+            current_makespan = current_solution.makespan
 
-            if next_solution.fitness >= current_fitness:
-                print(f"Iteration {iteration}: No improvement (current best: {current_fitness})")
+            if current_makespan >= best_makespan:
+                # print(f"Iteration {iteration}: No improvement (current best makespan: {best_makespan})")
                 break
 
-            print(f"Iteration {iteration}: Improved to {current_fitness}")
-            current_solution = next_solution
-            current_fitness = next_solution.fitness
+            # print(f"Iteration {iteration}: Improved to makespan {current_makespan}")
+            best_solution = current_solution
+            best_makespan = current_makespan
             iteration += 1
+        print(f"Hill Climbing 완료")
+        # print(f"Hill Climbing 완료 - Optimized Individual: {best_solution.seq}, Makespan: {best_solution.makespan}, Fitness: {best_solution.fitness}")
+        return best_solution
 
-        print("Hill Climbing 종료")
-        return current_solution
-
-    def get_neighbors(self, solution, config):
+    def get_neighbors(self, individual):
         neighbors = []
-        for i in range(len(solution.seq)):
-            for j in range(i + 1, len(solution.seq)):
-                neighbor = copy.deepcopy(solution)
-                neighbor.seq[i], neighbor.seq[j] = neighbor.seq[j], neighbor.seq[i]
-                neighbor.fitness = neighbor.calculate_fitness(config.target_makespan)  # 이웃의 적합도를 계산합니다. 수정
+        seq = individual.seq
+        for i in range(len(seq) - 1):
+            for j in range(i + 1, len(seq)):
+                neighbor_seq = seq[:]
+                neighbor_seq[i], neighbor_seq[j] = neighbor_seq[j], neighbor_seq[i]
+                neighbor = copy.deepcopy(individual)
+                neighbor.seq = neighbor_seq
+                neighbor.makespan, neighbor.mio_score = neighbor.evaluate(neighbor.machine_order)
+                neighbor.calculate_fitness(neighbor.config.target_makespan)
+                # print(f"Neighbor: {neighbor.seq}, Makespan: {neighbor.makespan}, Fitness: {neighbor.fitness}")
                 neighbors.append(neighbor)
         return neighbors

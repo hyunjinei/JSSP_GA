@@ -1,6 +1,6 @@
 # Population.py
 
-
+import copy
 import numpy as np
 import random
 from GAS.Individual import Individual
@@ -124,8 +124,49 @@ class JSSP:
         self.__init__(self.dataset)
         return s
 
+class GifflerThompson:
+    def __init__(self, priority_rules=None):
+        if priority_rules is None:
+            self.priority_rules = ['SPT', 'LPT', 'MWR', 'LWR', 'MOR', 'LOR', 'EDD']
+        else:
+            self.priority_rules = priority_rules
 
+    def optimize(self, individual, config):
+        selected_rule = random.choice(self.priority_rules)
+        schedule = self.giffler_thompson(individual.seq, individual.op_data, config, selected_rule)
+        optimized_individual = copy.deepcopy(individual)
+        optimized_individual.seq = schedule
+        optimized_individual.calculate_fitness(config.target_makespan)
+        return optimized_individual
 
+    def giffler_thompson(self, seq, op_data, config, rule):
+        sorted_seq = self.apply_priority_rule(seq, op_data, config, rule)
+        return sorted_seq
+
+    def apply_priority_rule(self, seq, op_data, config, rule):
+        def safe_get_op_data(x, idx):
+            try:
+                return op_data[x // config.n_machine][x % config.n_machine][idx]
+            except IndexError:
+                return float('inf') if idx == 1 else 0
+
+        if rule == 'SPT':
+            sorted_seq = sorted(seq, key=lambda x: safe_get_op_data(x, 1))
+        elif rule == 'LPT':
+            sorted_seq = sorted(seq, key=lambda x: -safe_get_op_data(x, 1))
+        elif rule == 'MWR':
+            sorted_seq = sorted(seq, key=lambda x: -sum(safe_get_op_data(x, 1) for i in range(config.n_machine)))
+        elif rule == 'LWR':
+            sorted_seq = sorted(seq, key=lambda x: sum(safe_get_op_data(x, 1) for i in range(config.n_machine)))
+        elif rule == 'MOR':
+            sorted_seq = sorted(seq, key=lambda x: -len([op for op in op_data[x // config.n_machine] if op[1] > 0]))
+        elif rule == 'LOR':
+            sorted_seq = sorted(seq, key=lambda x: len([op for op in op_data[x // config.n_machine] if op[1] > 0]))
+        elif rule == 'EDD':
+            sorted_seq = sorted(seq, key=lambda x: safe_get_op_data(x, 2))
+        else:
+            sorted_seq = seq  # Default to no sorting
+        return sorted_seq
 
 class Population:
     def __init__(self, config, op_data):
@@ -141,13 +182,20 @@ class Population:
         population = cls(config, dataset.op_data)  # Create the Population instance with required arguments
         population.individuals = individuals
         return population
-        
+
+    @classmethod
+    def from_giffler_thompson(cls, config, op_data, dataset_filename):
+        dataset = Dataset(dataset_filename)
+        giffler_thompson = GifflerThompson()
+        individuals = [Individual(config, seq=giffler_thompson.optimize(Individual(config, seq=random.sample(range(config.n_op), config.n_op), op_data=dataset.op_data), config).seq, op_data=dataset.op_data) for _ in range(config.population_size)]
+        population = cls(config, dataset.op_data)
+        population.individuals = individuals
+        return population
+
     def evaluate(self, target_makespan):
         for individual in self.individuals:
             individual.makespan, individual.mio_score = individual.evaluate(individual.machine_order)
             individual.calculate_fitness(target_makespan)
-            # print(f"Individual: {individual.seq}, Fitness: {individual.fitness}, Makespan: {individual.makespan}")
-            # print(f"Fitness: {individual.fitness}, Makespan: {individual.makespan}")
         # 스케일링 방법 선택 (Rank Scaling, Sigma Scaling, Boltzmann Scaling)
         scaling_method = 'min-max'  # 'min-max', 'sigma', 'boltzmann' 등을 사용할 수 있습니다.
 
@@ -168,17 +216,14 @@ class Population:
         if max_fitness - min_fitness > 0:
             for individual in self.individuals:
                 individual.scaled_fitness = (individual.fitness - min_fitness) / (max_fitness - min_fitness)
-                # print(f"Min-Max Scaled fitness: {individual.scaled_fitness}, Makespan: {individual.makespan}")
         else:
             for individual in self.individuals:
                 individual.scaled_fitness = 1.0  # In case all fitness values are the same
-                # print(f"Min-Max Scaled fitness: {individual.scaled_fitness}, Makespan: {individual.makespan}")
 
     def rank_scaling(self):
         sorted_individuals = sorted(self.individuals, key=lambda ind: ind.fitness, reverse=True)
         for rank, individual in enumerate(sorted_individuals):
             individual.scaled_fitness = rank + 1  # 순위를 적합도로 사용
-            # print(f"Rank Scaling - Individual: {individual.seq}, Scaled Fitness: {individual.scaled_fitness}")
 
     def sigma_scaling(self):
         fitness_values = [ind.fitness for ind in self.individuals]
@@ -190,8 +235,6 @@ class Population:
                 individual.scaled_fitness = 1 + (individual.fitness - mean_fitness) / (2 * std_fitness)
             else:
                 individual.scaled_fitness = 1  # 표준편차가 0인 경우
-            # print(f"Sigma Scaling - Individual: {individual.seq}, Scaled Fitness: {individual.scaled_fitness}")
-            # print(f"Makespan: {individual.makespan}")
 
     def boltzmann_scaling(self, T=1.0):
         fitness_values = [ind.fitness for ind in self.individuals]
@@ -200,56 +243,6 @@ class Population:
         
         for individual in self.individuals:
             individual.scaled_fitness = exp_values[self.individuals.index(individual)] / sum_exp_values
-            # print(f"Boltzmann Scaling - Individual: {individual.seq}, Scaled Fitness: {individual.scaled_fitness}")            
-            print(f"Makespan: {individual.makespan}")            
-        # # Apply min-max scaling
-        # fitness_values = [ind.fitness for ind in self.individuals]
-        # min_fitness = min(fitness_values)
-        # max_fitness = max(fitness_values)
-
-        # if max_fitness - min_fitness > 0:
-        #     for individual in self.individuals:
-        #         individual.scaled_fitness = (individual.fitness - min_fitness) / (max_fitness - min_fitness)
-        #         # print(f"Scaled fitness: {individual.scaled_fitness}, Makespan: {individual.makespan}")
-        # else:
-        #     for individual in self.individuals:
-        #         individual.scaled_fitness = 1.0  # In case all fitness values are the same
-        #         # print(f"Scaled fitness: {individual.scaled_fitness}, Makespan: {individual.makespan}")
-
-    #     # 스케일링 방법 선택 (Rank Scaling, Sigma Scaling, Boltzmann Scaling)
-    #     scaling_method = 'rank'  # 'sigma', 'boltzmann' 등을 사용할 수 있습니다.
-
-    #     if scaling_method == 'rank':
-    #         self.rank_scaling()
-    #     elif scaling_method == 'sigma':
-    #         self.sigma_scaling()
-    #     elif scaling_method == 'boltzmann':
-    #         self.boltzmann_scaling()
-    
-    # def rank_scaling(self):
-    #     sorted_individuals = sorted(self.individuals, key=lambda ind: ind.fitness, reverse=True)
-    #     for rank, individual in enumerate(sorted_individuals):
-    #         individual.scaled_fitness = rank + 1  # 순위를 적합도로 사용
-
-    # def sigma_scaling(self):
-    #     fitness_values = [ind.fitness for ind in self.individuals]
-    #     mean_fitness = np.mean(fitness_values)
-    #     std_fitness = np.std(fitness_values)
-        
-    #     for individual in self.individuals:
-    #         if std_fitness > 0:
-    #             individual.scaled_fitness = 1 + (individual.fitness - mean_fitness) / (2 * std_fitness)
-    #         else:
-    #             individual.scaled_fitness = 1  # 표준편차가 0인 경우
-
-    # def boltzmann_scaling(self, T=1.0):
-    #     fitness_values = [ind.fitness for ind in self.individuals]
-    #     exp_values = np.exp(fitness_values / T)
-    #     sum_exp_values = np.sum(exp_values)
-        
-    #     for individual in self.individuals:
-    #         individual.scaled_fitness = exp_values[self.individuals.index(individual)] / sum_exp_values
-
 
     def select(self, selection):
         self.individuals = [selection.select(self.individuals) for _ in range(self.config.population_size)]
@@ -268,5 +261,3 @@ class Population:
 
     def preserve_elites(self, elites):
         self.individuals[:len(elites)] = elites
-          
-

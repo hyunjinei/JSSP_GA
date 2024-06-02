@@ -1,46 +1,50 @@
-# # Local_Search/SimulatedAnnealing.py
 import copy
 import math
 import random
 
 class SimulatedAnnealing:
-    def __init__(self, initial_temp=1000, cooling_rate=0.95, min_temp=1, max_iter=10):
+    def __init__(self, initial_temp=1000, cooling_rate=0.95, min_temp=1, iterations=100):
         self.initial_temp = initial_temp
         self.cooling_rate = cooling_rate
         self.min_temp = min_temp
-        self.max_iter = max_iter  # 최대 반복 횟수 추가
+        self.iterations = iterations
 
     def optimize(self, individual, config):
+        print(f"Simulated Annealing 시작")       
+        # print(f"Simulated Annealing 시작 - Initial Individual: {individual.seq}, Makespan: {individual.makespan}, Fitness: {individual.fitness}")
+        best_solution = copy.deepcopy(individual)
         current_solution = copy.deepcopy(individual)
-        current_fitness = current_solution.calculate_fitness(config.target_makespan)  # 초기 적합도 계산
-
-        best_solution = copy.deepcopy(current_solution)
-        best_fitness = current_fitness
-
+        best_makespan = individual.makespan
+        current_makespan = individual.makespan
         temp = self.initial_temp
-        iterations = 0  # 반복 횟수 초기화
+        iteration = 0
 
-        while temp > self.min_temp and iterations < self.max_iter:  # 최대 반복 횟수 조건 추가
-            neighbor = self.get_random_neighbor(current_solution, config)
-            neighbor_fitness = neighbor.calculate_fitness(config.target_makespan)  # 이웃의 적합도 계산
+        while temp > self.min_temp and iteration < self.iterations:
+            neighbor = self.get_random_neighbor(current_solution)
+            neighbor_makespan = neighbor.makespan
 
-            if neighbor_fitness < best_fitness:  # 더 나은 적합도를 찾으면 갱신합니다.
+            if neighbor_makespan < best_makespan:
                 best_solution = copy.deepcopy(neighbor)
-                best_fitness = neighbor_fitness
+                best_makespan = neighbor_makespan
 
-            if neighbor_fitness < current_fitness or \
-                    math.exp((current_fitness - neighbor_fitness) / temp) > random.random():
+            if neighbor_makespan < current_makespan or \
+                    math.exp((current_makespan - neighbor_makespan) / temp) > random.random():
                 current_solution = neighbor
-                current_fitness = neighbor_fitness
+                current_makespan = neighbor_makespan
 
             temp *= self.cooling_rate
-            iterations += 1  # 반복 횟수 증가
+            iteration += 1
+            # print(f"Iteration {iteration} - Temperature: {temp}, Current Makespan: {current_makespan}, Best Makespan: {best_makespan}")
 
+        print(f"Simulated Annealing 완료")
+        # print(f"Simulated Annealing 완료 - Optimized Individual: {best_solution.seq}, Makespan: {best_solution.makespan}, Fitness: {best_solution.fitness}")
         return best_solution
 
-    def get_random_neighbor(self, solution, config):
-        neighbor = copy.deepcopy(solution)
-        i, j = random.sample(range(len(solution.seq)), 2)
+    def get_random_neighbor(self, individual):
+        neighbor = copy.deepcopy(individual)
+        i, j = random.sample(range(len(neighbor.seq)), 2)
         neighbor.seq[i], neighbor.seq[j] = neighbor.seq[j], neighbor.seq[i]
-        neighbor.calculate_fitness(config.target_makespan)  # 이웃의 적합도 계산
+        neighbor.makespan, neighbor.mio_score = neighbor.evaluate(neighbor.machine_order)
+        neighbor.calculate_fitness(neighbor.config.target_makespan)
+        # print(f"Neighbor: {neighbor.seq}, Makespan: {neighbor.makespan}, Fitness: {neighbor.fitness}")
         return neighbor

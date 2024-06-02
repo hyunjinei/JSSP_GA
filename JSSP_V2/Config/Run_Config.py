@@ -9,7 +9,8 @@ class Run_Config:
                  show_gantt=False,
                  save_gantt=False,
                  show_gui=False,
-                 trace_object='Process4', title=None):
+                 trace_object='Process4', title=None,
+                 tabu_search_iterations=100, hill_climbing_iterations=100, simulated_annealing_iterations=100):
 
         self.n_job = n_job
         self.n_machine = n_machine
@@ -36,6 +37,9 @@ class Run_Config:
         self.generations = generations
         self.dataset_filename = None  # 새로운 속성 추가
 
+        self.tabu_search_iterations = tabu_search_iterations
+        self.hill_climbing_iterations = hill_climbing_iterations
+        self.simulated_annealing_iterations = simulated_annealing_iterations
 
         script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Get the directory of the current script
         folder_name = 'result'  # Define the folder name

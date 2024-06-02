@@ -50,7 +50,7 @@ from postprocessing.PostProcessing import generate_machine_log  # 수정된 부�
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-TARGET_MAKESPAN = 1234  # 목표 Makespan
+TARGET_MAKESPAN = 83  # 목표 Makespan
 MIGRATION_FREQUENCY = 4  # Migration frequency 설정
 
 # GA 엔진 실행 함수
@@ -65,19 +65,20 @@ def run_ga_engine(ga_engine, index, elite=None):
         return None
 
 def main():
-    initialization_mode = input("Select Initialization GA mode (1: basic, 2: MIO): ")
+    initialization_mode = input("Select Initialization GA mode (1: basic, 2: MIO, 3: GifflerThompson): ")
     print(f"Selected Initialization GA mode: {initialization_mode}")
     
     island_mode = input("Select Island-Parallel GA mode (1: Independent, 2: Sequential Migration, 3: Random Migration): ")
     print(f"Selected Island-Parallel GA mode: {island_mode}")
 
-    file = 'abz5.txt'
+    file = 'test_33.txt'
 
     dataset = Dataset(file)
-    config = Run_Config(n_job=10, n_machine=10, n_op=100, population_size=200, generations=200, 
+    config = Run_Config(n_job=3, n_machine=3, n_op=9, population_size=20, generations=5, 
                         print_console=False, save_log=True, save_machinelog=True, 
                         show_gantt=False, save_gantt=True, show_gui=False,
-                        trace_object='Process4', title='Gantt Chart for JSSP')
+                        trace_object='Process4', title='Gantt Chart for JSSP',
+                        tabu_search_iterations=100, hill_climbing_iterations=100, simulated_annealing_iterations=100)
                         
     config.dataset_filename = file  # dataset 파일명 설정
 
@@ -127,20 +128,20 @@ def main():
     '''
 
     custom_settings = [
-        {'crossover': PMXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': RouletteSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
-        {'crossover': OrderCrossover, 'pc': 0.7, 'mutation': GeneralMutation, 'pm': 0.2, 'selection': TournamentSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
-        {'crossover': LOXCrossover, 'pc': 0.7, 'mutation': DisplacementMutation, 'pm': 0.2, 'selection': RouletteSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
-        {'crossover': OBC, 'pc': 0.7, 'mutation': InsertionMutation, 'pm': 0.2, 'selection': TournamentSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
-        {'crossover': PositionBasedCrossover, 'pc': 0.7, 'mutation': ReciprocalExchangeMutation, 'pm': 0.2, 'selection': SeedSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
-        {'crossover': SXX, 'pc': 0.7, 'mutation': ShiftMutation, 'pm': 0.2, 'selection': SeedSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
-        {'crossover': PSXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': RouletteSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
-        {'crossover': PMXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': TournamentSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
-        {'crossover': OrderCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': TournamentSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
-        {'crossover': LOXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': SeedSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
-        {'crossover': OBC, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': TournamentSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
-        {'crossover': PositionBasedCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': RouletteSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
-        {'crossover': SXX, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': SeedSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
-        {'crossover': PSXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': RouletteSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
+        # {'crossover': PMXCrossover, 'pc': 0.8, 'mutation': InversionMutation, 'pm': 0.1, 'selection': RouletteSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.8, pm_low=0.01, rank_divide=0.5)}, 
+        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InversionMutation, 'pm': 0.2, 'selection': TournamentSelection(), 'local_search': [HillClimbing(), SimulatedAnnealing()], 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.8, pm_low=0.01, rank_divide=0.5)}, 
+        # {'crossover': LOXCrossover, 'pc': 0.8, 'mutation': DisplacementMutation, 'pm': 0.1, 'selection': RouletteSelection(), 'local_search': HillClimbing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.8, pm_low=0.01, rank_divide=0.5)}, 
+        # {'crossover': OBC, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': TabuSearch(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.8, pm_low=0.01, rank_divide=0.5)}, 
+        # {'crossover': PositionBasedCrossover, 'pc': 0.8, 'mutation': ReciprocalExchangeMutation, 'pm': 0.1, 'selection': SeedSelection(), 'local_search': HillClimbing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.8, pm_low=0.01, rank_divide=0.5)}, 
+        # {'crossover': SXX, 'pc': 0.8, 'mutation': ShiftMutation, 'pm': 0.1, 'selection': SeedSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.8, pm_low=0.01, rank_divide=0.5)}, 
+        # {'crossover': PSXCrossover, 'pc': 0.8, 'mutation': InversionMutation, 'pm': 0.1, 'selection': RouletteSelection(), 'local_search': GifflerThompson(priority_rule='LOR'), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.8, pm_low=0.01, rank_divide=0.5)}, 
+ #       # {'crossover': PMXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': TournamentSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
+        # {'crossover': OrderCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': TournamentSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
+        # {'crossover': LOXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': SeedSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
+        # {'crossover': OBC, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': TournamentSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
+        # {'crossover': PositionBasedCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': RouletteSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
+        # {'crossover': SXX, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': SeedSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
+        # {'crossover': PSXCrossover, 'pc': 0.7, 'mutation': InversionMutation, 'pm': 0.2, 'selection': RouletteSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.1, pm_low=0.01, rank_divide=0.5)}, 
     ]
 
     ga_engines = []
@@ -148,7 +149,7 @@ def main():
         crossover_class = setting['crossover']
         mutation_class = setting['mutation']
         selection_instance = setting['selection']
-        local_search_class = setting['local_search']
+        local_search_methods = setting['local_search']  # 여러 로컬 서치 메서드 리스트로 설정
         pso_class = setting.get('pso')  # pso 설정 추가
         selective_mutation_instance = setting['selective_mutation']  # SelectiveMutation 설정 추가 
         pc = setting['pc']
@@ -157,13 +158,15 @@ def main():
         crossover = crossover_class(pc=pc)
         mutation = mutation_class(pm=pm)
         selection = selection_instance
-        local_search = local_search_class if local_search_class else None
         pso = pso_class if pso_class else None  # pso 인스턴스 생성
+        local_search = local_search_methods
         
         if initialization_mode == '1':
-            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso, elite_ratio=0.1, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY))
-        else:
-            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso, elite_ratio=0.1, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, initialization_mode='2', dataset_filename=config.dataset_filename))
+            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso, elite_ratio=0.05, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY))
+        elif initialization_mode == '2':
+            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso, elite_ratio=0.05, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, initialization_mode='2', dataset_filename=config.dataset_filename))
+        elif initialization_mode == '3':
+            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso, elite_ratio=0.05, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, initialization_mode='3', dataset_filename=config.dataset_filename))
 
     best_individuals = [None] * len(ga_engines)  # Indexing issue fix
     stop_evolution = False
