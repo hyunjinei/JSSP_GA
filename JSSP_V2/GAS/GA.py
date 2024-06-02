@@ -87,6 +87,13 @@ class GAEngine:
                     # Local Search 후 염색체, makespan, fitness 출력
                     print(f"After Local Search - Individual: {optimized_ind.seq}, Makespan: {optimized_ind.makespan}, Fitness: {optimized_ind.fitness}")
 
+                # Apply PSO to each individual in the population
+                if self.pso:
+                    print("PSO 시작")
+                    for i in range(len(self.population.individuals)):
+                        optimized_ind = self.pso.optimize(self.population.individuals[i], self.config)
+                        self.population.individuals[i] = optimized_ind
+                        
                 # Elitism: 최상의 해를 새로운 Population에 추가합니다.
                 self.population.individuals[:num_elites] = elites
 
