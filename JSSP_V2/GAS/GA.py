@@ -35,12 +35,13 @@ def migrate_top_10_percent(ga_engines, migration_order, island_mode):
             target_island.population.individuals[replacement_idx] = copy.deepcopy(best_individual)
 
 class GAEngine:
-    def __init__(self, config, op_data, crossover, mutation, selection, local_search=None, pso=None, selective_mutation=None, elite_ratio=0.1, ga_engines=None, island_mode=1, migration_frequency=10, initialization_mode='1', dataset_filename=None, initial_population=None):
+    def __init__(self, config, op_data, crossover, mutation, selection, local_search=None, pso=None, selective_mutation=None, elite_ratio=0.1, ga_engines=None, island_mode=1, migration_frequency=10, initialization_mode='1', dataset_filename=None, initial_population=None, local_search_frequency=2):
         self.config = config
         self.op_data = op_data
         self.crossover = crossover
         self.mutation = mutation
         self.selection = selection
+        self.local_search = local_search  # local_search 속성 설정
         self.local_search_methods = local_search if local_search else []  # local_search를 리스트로 변경
         self.pso = pso  # PSO 추가
         self.selective_mutation = selective_mutation  # SelectiveMutation 추가
@@ -50,6 +51,7 @@ class GAEngine:
         self.island_mode = island_mode
         self.migration_frequency = migration_frequency
         self.dataset_filename = dataset_filename  # 새로운 인자 추가
+        self.local_search_frequency = local_search_frequency  # 로컬 서치 주기 설정
 
         if initialization_mode == '2':
             self.population = Population.from_mio(config, op_data, dataset_filename)
@@ -77,25 +79,22 @@ class GAEngine:
                 self.population.crossover(self.crossover)
                 self.population.mutate(self.mutation)
 
-                # Apply local search to each individual in the population
-                for i in range(len(self.population.individuals)):
-                    individual = self.population.individuals[i]
-                    optimized_ind = self.apply_local_search(individual)
-                    # Local Search 전 염색체, makespan, fitness 출력
-                    print(f"Before Local Search - Individual: {individual.seq}, Makespan: {individual.makespan}, Fitness: {individual.fitness}")
-                    self.population.individuals[i] = optimized_ind
-                    # Local Search 후 염색체, makespan, fitness 출력
-                    print(f"After Local Search - Individual: {optimized_ind.seq}, Makespan: {optimized_ind.makespan}, Fitness: {optimized_ind.fitness}")
+                # Selective Mutation 적용
+                if self.selective_mutation:
+                    print('Selective Mutation 전반부 적용')
+                    self.selective_mutation.mutate(self.population.individuals, self.config)
 
-                # Apply PSO to each individual in the population
-                if self.pso:
-                    print("PSO 시작")
-                    for i in range(len(self.population.individuals)):
-                        optimized_ind = self.pso.optimize(self.population.individuals[i], self.config)
-                        self.population.individuals[i] = optimized_ind
-                        
-                # Elitism: 최상의 해를 새로운 Population에 추가합니다.
-                self.population.individuals[:num_elites] = elites
+                # # Elitism: 최상의 해를 새로운 Population에 추가합니다.(Population 초기 갯수 몇개 대체)
+                # self.population.individuals[:num_elites] = elites
+
+                # # Elitism: 최악의 해를 최상의 해로 대체합니다.
+                # sorted_population = sorted(self.population.individuals, key=lambda ind: ind.fitness)
+                # self.population.individuals[-num_elites:] = elites
+
+                # Elitism: 최상의 해를 새로운 Population에 랜덤하게 추가합니다.
+                for elite in elites:
+                    random_index = random.randint(0, len(self.population.individuals) - 1)
+                    self.population.individuals[random_index] = elite
 
                 print(f"Generation {generation} evaluated")
                 current_best = min(self.population.individuals, key=lambda ind: ind.makespan)
@@ -122,10 +121,34 @@ class GAEngine:
                         migration_order = random.sample(range(len(self.ga_engines)), len(self.ga_engines))
                         migrate_top_10_percent(self.ga_engines, migration_order, self.island_mode)
 
+                # Apply local search at specified frequency
+                if generation > 0 and generation % self.local_search_frequency == 0:
+                    print("Applying local search")
+                    for i in range(len(self.population.individuals)):
+                        individual = self.population.individuals[i]
+                        optimized_ind = self.apply_local_search(individual)
+                        # Local Search 전 염색체, makespan, fitness 출력
+                        # print(f"Before Local Search - Individual: {individual.seq}, Makespan: {individual.makespan}, Fitness: {individual.fitness}")
+                        self.population.individuals[i] = optimized_ind
+                        # Local Search 후 염색체, makespan, fitness 출력
+                        # print(f"After Local Search - Individual: {optimized_ind.seq}, Makespan: {optimized_ind.makespan}, Fitness: {optimized_ind.fitness}")
+
+                # # Selective Mutation 적용
+                # if self.selective_mutation:
+                #     print('Selective Mutation 후반부 적용')
+                #     self.selective_mutation.mutate(self.population.individuals, self.config)
+
                 # 목표 Makespan에 도달하면 멈춤
                 if best_individual.makespan <= self.config.target_makespan:
                     print(f"Stopping early as best makespan {best_individual.makespan} is below target {self.config.target_makespan}.")
                     break
+
+            # Apply PSO to each individual in the population
+            if self.pso:
+                print("Applying PSO after all generations")
+                for i in range(len(self.population.individuals)):
+                    optimized_ind = self.pso.optimize(self.population.individuals[i], self.config)
+                    self.population.individuals[i] = optimized_ind
 
             end_time = time.time()
             execution_time = end_time - start_time

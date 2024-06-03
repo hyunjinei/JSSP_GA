@@ -38,16 +38,18 @@ class PSO:
                 particles[i].seq = particles[i].seq.astype(int).tolist()
 
                 # 시퀀스 유효성 검사 및 수정
-                particles[i].seq = self.ensure_valid_sequence(particles[i].seq, len(individual.seq))
+                particles[i].seq = self.ensure_valid_sequence(particles[i].seq, config)
 
-                fitness = particles[i].calculate_fitness(config.target_makespan)
+                # 새로운 개체 생성 및 평가
+                new_individual = self.create_new_individual(particles[i], particles[i].seq, config)
+                fitness = new_individual.fitness
                 
                 if fitness < personal_best_fitness[i]:
                     personal_best_positions[i] = particles[i].seq[:]
                     personal_best_fitness[i] = fitness
 
                 if fitness < global_best_fitness:
-                    global_best_particle = copy.deepcopy(particles[i])
+                    global_best_particle = copy.deepcopy(new_individual)
                     global_best_position = particles[i].seq[:]
                     global_best_fitness = fitness
 
@@ -56,9 +58,34 @@ class PSO:
         print("PSO 종료")
         return global_best_particle
 
-    def ensure_valid_sequence(self, seq, length):
-        # 시퀀스에서 중복된 값 제거 및 누락된 값 추가
-        valid_seq = list(set(seq))
-        missing_values = [i for i in range(length) if i not in valid_seq]
-        valid_seq.extend(missing_values)
-        return valid_seq[:length]
+    def create_new_individual(self, individual, new_seq, config):
+        new_individual = copy.deepcopy(individual)
+        new_individual.seq = new_seq
+        new_individual.job_seq = new_individual.get_repeatable()
+        new_individual.feasible_seq = new_individual.get_feasible()
+        new_individual.machine_order = new_individual.get_machine_order()
+        new_individual.makespan, new_individual.mio_score = new_individual.evaluate(new_individual.machine_order)
+        new_individual.calculate_fitness(config.target_makespan)
+        return new_individual
+
+    def ensure_valid_sequence(self, seq, config):
+        # JSSP의 제약조건을 반영하여 유효한 시퀀스를 생성하는 로직 추가
+        num_jobs = config.n_job
+        num_machines = config.n_machine
+        job_counts = {job: 0 for job in range(num_jobs)}
+        valid_seq = []
+
+        # 각 작업이 모든 기계에서 한번씩 수행되는지 확인
+        for operation in seq:
+            job = operation // num_machines
+            if job_counts[job] < num_machines:
+                valid_seq.append(job * num_machines + job_counts[job])
+                job_counts[job] += 1
+
+        # 누락된 작업 추가
+        for job in range(num_jobs):
+            while job_counts[job] < num_machines:
+                valid_seq.append(job * num_machines + job_counts[job])
+                job_counts[job] += 1
+
+        return valid_seq

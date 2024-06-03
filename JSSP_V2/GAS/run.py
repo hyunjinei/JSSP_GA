@@ -36,7 +36,7 @@ from GAS.Selection.TournamentSelection import TournamentSelection
 from Local_Search.HillClimbing import HillClimbing
 from Local_Search.TabuSearch import TabuSearch
 from Local_Search.SimulatedAnnealing import SimulatedAnnealing
-from Local_Search.GifflerThompson import GifflerThompson
+from Local_Search.GifflerThompson_LS import GifflerThompson_LS
 
 # Meta Heuristic
 from Meta.PSO import PSO  # pso를 추가합니다
@@ -68,8 +68,8 @@ la10: 958  15, 5/  la20: 902   10, 10
 abz5 = 1234  10, 10
 ft20 = 1165
 '''
-TARGET_MAKESPAN = 666  # 목표 Makespan
-MIGRATION_FREQUENCY = 4  # Migration frequency 설정
+TARGET_MAKESPAN = 655  # 목표 Makespan
+MIGRATION_FREQUENCY = 100  # Migration frequency 설정
 
 # GA 엔진 실행 함수
 def run_ga_engine(ga_engine, index, elite=None):
@@ -89,7 +89,7 @@ def main():
     island_mode = input("Select Island-Parallel GA mode (1: Independent, 2: Sequential Migration, 3: Random Migration): ")
     print(f"Selected Island-Parallel GA mode: {island_mode}")
 
-    file = 'la01.txt'
+    file = 'la02.txt'
 
     dataset = Dataset(file)
     config = Run_Config(n_job=10, n_machine=5, n_op=50, population_size=200, generations=200, 
@@ -126,7 +126,7 @@ def main():
     '''
     mutations 
     [GeneralMutation, DisplacementMutation, InsertionMutation, 
-    ReciprocalExchangeMutation,ShiftMutation, InversionMutation]
+    ReciprocalExchangeMutation,ShiftMutation, InversionMutation, SwapMutation]
     '''
 
     '''
@@ -144,12 +144,12 @@ def main():
     Meta Heuristic
     ['pso': PSO(num_particles=10, num_iterations=50)], 'pso': None  # PSO 추가
     '''
-
+# InsertionMutation
     custom_settings = [
-        {'crossover': PMXCrossover, 'pc': 0.8, 'mutation': SwapMutation, 'pm': 0.2, 'selection': RouletteSelection(), 'local_search': SimulatedAnnealing(), 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.8, pm_low=0.01, rank_divide=0.5)}, 
-        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.2, 'selection': TournamentSelection(), 'local_search': [GifflerThompson(), HillClimbing(), SimulatedAnnealing()], 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.8, pm_low=0.01, rank_divide=0.5)}
+        {'crossover': PMXCrossover, 'pc': 0.8, 'mutation': SwapMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [SimulatedAnnealing()], 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.3)},
+        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [GifflerThompson_LS(priority_rule=None)], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.3)}
     ]
-
+# GifflerThompson_LS(priority_rule=None), SimulatedAnnealing()
     ga_engines = []
     for i, setting in enumerate(custom_settings):
         crossover_class = setting['crossover']
@@ -166,13 +166,16 @@ def main():
         selection = selection_instance
         pso = pso_class if pso_class else None  # pso 인스턴스 생성
         local_search = local_search_methods
+        local_search_frequency = 50  # 100세대마다 로컬 서치를 수행하도록 설정
+        selective_mutation = selective_mutation_instance  # SelectiveMutation 인스턴스 생성
         
         if initialization_mode == '1':
-            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso, elite_ratio=0.1, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY))
+            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso,selective_mutation, elite_ratio=0.1, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, local_search_frequency=local_search_frequency))
         elif initialization_mode == '2':
-            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso, elite_ratio=0.05, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, initialization_mode='2', dataset_filename=config.dataset_filename))
+            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso,selective_mutation, elite_ratio=0.05, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, initialization_mode='2', dataset_filename=config.dataset_filename, local_search_frequency=local_search_frequency))
         elif initialization_mode == '3':
-            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso, elite_ratio=0.05, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, initialization_mode='3', dataset_filename=config.dataset_filename))
+            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso,selective_mutation, elite_ratio=0.05, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, initialization_mode='3', dataset_filename=config.dataset_filename, local_search_frequency=local_search_frequency))
+
 
     best_individuals = [None] * len(ga_engines)  # Indexing issue fix
     stop_evolution = False
@@ -202,8 +205,9 @@ def main():
                                 crossover_name = best_crossover.__class__.__name__
                                 mutation_name = best_mutation.__class__.__name__
                                 selection_name = ga_engines[index].selection.__class__.__name__
-                                local_search_name = ga_engines[index].local_search.__class__.__name__ if ga_engines[index].local_search else 'None'
-                                pso_name = ga_engines[index].pso.__class__.__name__ if ga_engines[index].pso else 'None'  # pso 이름 추가
+                                local_search_names = [ls.__class__.__name__ for ls in ga_engines[index].local_search]
+                                local_search_name = "_".join(local_search_names)
+                                pso_name = ga_engines[index].pso.__class__.__name__ if ga_engines[index].pso else 'None'
                                 pc = best_crossover.pc
                                 pm = best_mutation.pm
                                 log_path = os.path.join(result_txt_path, f'log_GA{index+1}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_{pso_name}_pc{pc}_pm{pm}.csv')
@@ -222,7 +226,7 @@ def main():
                                 # 목표 Makespan에 도달하면 멈춤
                                 if best.makespan <= TARGET_MAKESPAN:
                                     stop_evolution = True
-                                    print(f"Stopping early as best makespan {best_individual.makespan} is below target {TARGET_MAKESPAN}.")
+                                    print(f"Stopping early as best makespan {best.makespan} is below target {TARGET_MAKESPAN}.")
                                     break
 
                                 # 모든 파일이 생성된 경우 멈춤
@@ -266,8 +270,9 @@ def main():
                                 crossover_name = best_crossover.__class__.__name__
                                 mutation_name = best_mutation.__class__.__name__
                                 selection_name = ga_engines[index].selection.__class__.__name__
-                                local_search_name = ga_engines[index].local_search.__class__.__name__ if ga_engines[index].local_search else 'None'
-                                pso_name = ga_engines[index].pso.__class__.__name__ if ga_engines[index].pso else 'None'  # pso 이름 추가
+                                local_search_names = [ls.__class__.__name__ for ls in ga_engines[index].local_search]
+                                local_search_name = "_".join(local_search_names)
+                                pso_name = ga_engines[index].pso.__class__.__name__ if ga_engines[index].pso else 'None'
                                 pc = best_crossover.pc
                                 pm = best_mutation.pm
                                 log_path = os.path.join(result_txt_path, f'log_GA{index+1}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_{pso_name}_pc{pc}_pm{pm}.csv')
@@ -308,8 +313,9 @@ def main():
             crossover_name = best_crossover.__class__.__name__
             mutation_name = best_mutation.__class__.__name__
             selection_name = ga_engines[i].selection.__class__.__name__
-            local_search_name = ga_engines[i].local_search.__class__.__name__ if ga_engines[i].local_search else 'None'
-            pso_name = ga_engines[i].pso.__class__.__name__ if ga_engines[i].pso else 'None'  # pso 이름 추가
+            local_search_names = [ls.__class__.__name__ for ls in ga_engines[i].local_search]
+            local_search_name = "_".join(local_search_names)
+            pso_name = ga_engines[i].pso.__class__.__name__ if ga_engines[i].pso else 'None'
             pc = best_crossover.pc
             pm = best_mutation.pm
             print(f"Best solution for GA{i+1}: {best} using {crossover_name} with pc={pc} and {mutation_name} with pm={pm} and selection: {selection_name} and Local Search: {local_search_name} and pso: {pso_name}, Time taken: {execution_time:.2f} seconds, First best time: {best_time:.2f} seconds")

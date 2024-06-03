@@ -5,9 +5,10 @@ from collections import deque
 import random
 
 class TabuSearch:
-    def __init__(self, tabu_tenure=10, iterations=100):
+    def __init__(self, tabu_tenure=5, iterations=20, max_neighbors=10):
         self.tabu_tenure = tabu_tenure
         self.iterations = iterations
+        self.max_neighbors = max_neighbors  # 최대 이웃 개수를 추가
 
     def optimize(self, individual, config):
         print(f"Tabu Search 시작")
@@ -18,7 +19,7 @@ class TabuSearch:
         tabu_list.append(copy.deepcopy(individual.seq))
 
         for iteration in range(self.iterations):
-            neighbors = self.get_neighbors(individual)
+            neighbors = self.get_neighbors(individual, config)
             # print(f"Iteration {iteration + 1} - Number of Neighbors: {len(neighbors)}")
             neighbors = [n for n in neighbors if n.seq not in tabu_list]
 
@@ -39,21 +40,49 @@ class TabuSearch:
             # print(f"Iteration {iteration + 1} - Current Best Makespan: {best_makespan}, Fitness: {best_solution.fitness}")
 
         # 최적화 후 염색체, makespan, fitness 출력
-        print(f"Tabu Search 완료")
-        # print(f"Tabu Search 완료 - Optimized Individual: {best_solution.seq}, Makespan: {best_solution.makespan}, Fitness: {best_solution.fitness}")
+        # print(f"Tabu Search 완료")
+        print(f"Tabu Search 완료 - Optimized Individual: {best_solution.seq}, Makespan: {best_solution.makespan}, Fitness: {best_solution.fitness}")
         return best_solution
 
-    def get_neighbors(self, individual):
+    def get_neighbors(self, individual, config):
         neighbors = []
         seq = individual.seq
         for i in range(len(seq) - 1):
             for j in range(i + 1, len(seq)):
+                if len(neighbors) >= self.max_neighbors:  # 최대 이웃 개수 조건 추가
+                    return neighbors
                 neighbor_seq = seq[:]
                 neighbor_seq[i], neighbor_seq[j] = neighbor_seq[j], neighbor_seq[i]
-                neighbor = copy.deepcopy(individual)
-                neighbor.seq = neighbor_seq
-                neighbor.makespan, neighbor.mio_score = neighbor.evaluate(neighbor.machine_order)
-                neighbor.calculate_fitness(neighbor.config.target_makespan)
+                neighbor = self.create_new_individual(individual, neighbor_seq, config)
                 # print(f"Neighbor: {neighbor.seq}, Makespan: {neighbor.makespan}, Fitness: {neighbor.fitness}")
                 neighbors.append(neighbor)
         return neighbors
+
+    def create_new_individual(self, individual, new_seq, config):
+        new_individual = copy.deepcopy(individual)
+        new_individual.seq = new_seq
+        new_individual.job_seq = new_individual.get_repeatable()
+        new_individual.feasible_seq = new_individual.get_feasible()
+        new_individual.machine_order = new_individual.get_machine_order()
+        new_individual.makespan, new_individual.mio_score = new_individual.evaluate(new_individual.machine_order)
+        new_individual.calculate_fitness(config.target_makespan)
+        return new_individual
+
+    def ensure_valid_sequence(self, seq, config):
+        num_jobs = config.n_job
+        num_machines = config.n_machine
+        job_counts = {job: 0 for job in range(num_jobs)}
+        valid_seq = []
+
+        for operation in seq:
+            job = operation // num_machines
+            if job_counts[job] < num_machines:
+                valid_seq.append(job * num_machines + job_counts[job])
+                job_counts[job] += 1
+
+        for job in range(num_jobs):
+            while job_counts[job] < num_machines:
+                valid_seq.append(job * num_machines + job_counts[job])
+                job_counts[job] += 1
+
+        return valid_seq

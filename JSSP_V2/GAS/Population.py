@@ -207,7 +207,7 @@ class Population:
             self.sigma_scaling()
         elif scaling_method == 'boltzmann':
             self.boltzmann_scaling()
-    
+
     def min_max_scaling(self):
         fitness_values = [ind.fitness for ind in self.individuals]
         min_fitness = min(fitness_values)
