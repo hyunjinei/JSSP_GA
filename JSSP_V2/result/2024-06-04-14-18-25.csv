@@ -1,0 +1,151 @@
+Time,Event,Part,Process,Machine
+0,Part0 Created,Part0_0,Source0,
+0,Part1 Created,Part1_0,Source1,
+0,Part2 Created,Part2_0,Source2,
+0,Part3 Created,Part3_0,Source3,
+0,Part4 Created,Part4_0,Source4,
+0,Part5 Created,Part5_0,Source5,
+0,Part6 Created,Part6_0,Source6,
+0,Part7 Created,Part7_0,Source7,
+0,Part8 Created,Part8_0,Source8,
+0,Part9 Created,Part9_0,Source9,
+0,Part0_0_Routing Start,Part0_0,Source0,
+0,Part1_0_Routing Start,Part1_0,Source1,
+0,Part2_0_Routing Start,Part2_0,Source2,
+0,Part3_0_Routing Start,Part3_0,Source3,
+0,Part4_0_Routing Start,Part4_0,Source4,
+0,Part5_0_Routing Start,Part5_0,Source5,
+0,Part6_0_Routing Start,Part6_0,Source6,
+0,Part7_0_Routing Start,Part7_0,Source7,
+0,Part8_0_Routing Start,Part8_0,Source8,
+0,Part9_0_Routing Start,Part9_0,Source9,
+0,Part0_0_Routing Finished,Part0_0,Source0,
+0,Part0_0 transferred from Source,Part0_0,Process0,
+0,Part1_0_Routing Finished,Part1_0,Source1,
+0,Part1_0 transferred from Source,Part1_0,Process4,
+0,Part2_0_Routing Finished,Part2_0,Source2,
+0,Part2_0 transferred from Source,Part2_0,Process1,
+0,Part3_0_Routing Finished,Part3_0,Source3,
+0,Part3_0 transferred from Source,Part3_0,Process2,
+0,Part4_0_Routing Finished,Part4_0,Source4,
+0,Part4_0 transferred from Source,Part4_0,Process4,
+0,Part5_0_Routing Finished,Part5_0,Source5,
+0,Part5_0 transferred from Source,Part5_0,Process1,
+0,Part6_0_Routing Finished,Part6_0,Source6,
+0,Part6_0 transferred from Source,Part6_0,Process4,
+0,Part7_0_Routing Finished,Part7_0,Source7,
+0,Part7_0 transferred from Source,Part7_0,Process1,
+0,Part8_0_Routing Finished,Part8_0,Source8,
+0,Part8_0 transferred from Source,Part8_0,Process4,
+0,Part9_0_Routing Finished,Part9_0,Source9,
+0,Part9_0 transferred from Source,Part9_0,Process4,
+0,Started,Part0_0,Process0,M0
+0,Started,Part4_0,Process4,M4
+0,Started,Part2_0,Process1,M1
+20,Finished,Part0_0,Process0,M0
+20,Started,Part0_0,Process3,M3
+27,Finished,Part4_0,Process4,M4
+27,Started,Part1_0,Process4,M4
+27,Started,Part4_0,Process0,M0
+52,Finished,Part1_0,Process4,M4
+52,Started,Part8_0,Process4,M4
+52,Started,Part1_0,Process2,M2
+66,Finished,Part8_0,Process4,M4
+69,Finished,Part4_0,Process0,M0
+72,Finished,Part2_0,Process1,M1
+72,Started,Part7_0,Process1,M1
+84,Finished,Part1_0,Process2,M2
+84,Started,Part2_0,Process2,M2
+84,Started,Part1_0,Process0,M0
+107,Finished,Part0_0,Process3,M3
+107,Finished,Part2_0,Process2,M2
+107,Started,Part4_0,Process3,M3
+107,Started,Part3_0,Process2,M2
+107,Started,Part2_0,Process4,M4
+108,Finished,Part1_0,Process0,M0
+108,Started,Part8_0,Process0,M0
+135,Finished,Part7_0,Process1,M1
+135,Finished,Part2_0,Process4,M4
+135,Started,Part1_0,Process1,M1
+135,Started,Part6_0,Process4,M4
+153,Finished,Part1_0,Process1,M1
+153,Started,Part5_0,Process1,M1
+155,Finished,Part4_0,Process3,M3
+155,Started,Part1_0,Process3,M3
+163,Finished,Part6_0,Process4,M4
+163,Started,Part9_0,Process4,M4
+183,Finished,Part8_0,Process0,M0
+183,Started,Part2_0,Process0,M0
+193,Finished,Part3_0,Process2,M2
+193,Started,Part4_0,Process2,M2
+210,Finished,Part4_0,Process2,M2
+220,Finished,Part5_0,Process1,M1
+220,Started,Part0_0,Process1,M1
+235,Finished,Part9_0,Process4,M4
+235,Started,Part9_0,Process2,M2
+236,Finished,Part1_0,Process3,M3
+236,Completed,Part1_0,Sink,
+241,Finished,Part2_0,Process0,M0
+241,Started,Part5_0,Process0,M0
+241,Started,Part2_0,Process3,M3
+251,Finished,Part0_0,Process1,M1
+251,Started,Part0_0,Process4,M4
+253,Finished,Part9_0,Process2,M2
+253,Started,Part8_0,Process2,M2
+253,Started,Part9_0,Process1,M1
+290,Finished,Part9_0,Process1,M1
+290,Started,Part6_0,Process1,M1
+302,Finished,Part6_0,Process1,M1
+302,Started,Part4_0,Process1,M1
+303,Finished,Part8_0,Process2,M2
+327,Finished,Part0_0,Process4,M4
+339,Finished,Part5_0,Process0,M0
+339,Started,Part7_0,Process0,M0
+339,Started,Part5_0,Process4,M4
+340,Finished,Part2_0,Process3,M3
+340,Completed,Part2_0,Sink,
+340,Started,Part6_0,Process3,M3
+348,Finished,Part4_0,Process1,M1
+348,Completed,Part4_0,Sink,
+348,Started,Part3_0,Process1,M1
+359,Finished,Part6_0,Process3,M3
+359,Started,Part9_0,Process3,M3
+387,Finished,Part5_0,Process4,M4
+424,Finished,Part3_0,Process1,M1
+424,Started,Part8_0,Process1,M1
+424,Started,Part3_0,Process4,M4
+433,Finished,Part7_0,Process0,M0
+433,Started,Part6_0,Process0,M0
+433,Started,Part7_0,Process2,M2
+438,Finished,Part9_0,Process3,M3
+438,Started,Part5_0,Process3,M3
+465,Finished,Part8_0,Process1,M1
+465,Finished,Part5_0,Process3,M3
+465,Started,Part8_0,Process3,M3
+513,Finished,Part6_0,Process0,M0
+520,Finished,Part8_0,Process3,M3
+520,Completed,Part8_0,Sink,
+521,Finished,Part3_0,Process4,M4
+521,Started,Part3_0,Process0,M0
+531,Finished,Part7_0,Process2,M2
+531,Started,Part5_0,Process2,M2
+531,Started,Part7_0,Process3,M3
+566,Finished,Part3_0,Process0,M0
+566,Started,Part9_0,Process0,M0
+581,Finished,Part7_0,Process3,M3
+581,Started,Part3_0,Process3,M3
+581,Started,Part7_0,Process4,M4
+593,Finished,Part5_0,Process2,M2
+593,Completed,Part5_0,Sink,
+593,Started,Part0_0,Process2,M2
+610,Finished,Part0_0,Process2,M2
+610,Completed,Part0_0,Sink,
+610,Started,Part6_0,Process2,M2
+627,Finished,Part9_0,Process0,M0
+627,Completed,Part9_0,Sink,
+660,Finished,Part6_0,Process2,M2
+660,Completed,Part6_0,Sink,
+661,Finished,Part7_0,Process4,M4
+661,Completed,Part7_0,Sink,
+671,Finished,Part3_0,Process3,M3
+671,Completed,Part3_0,Sink,

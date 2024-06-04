@@ -35,7 +35,7 @@ def migrate_top_10_percent(ga_engines, migration_order, island_mode):
             target_island.population.individuals[replacement_idx] = copy.deepcopy(best_individual)
 
 class GAEngine:
-    def __init__(self, config, op_data, crossover, mutation, selection, local_search=None, pso=None, selective_mutation=None, elite_ratio=0.1, ga_engines=None, island_mode=1, migration_frequency=10, initialization_mode='1', dataset_filename=None, initial_population=None, local_search_frequency=2):
+    def __init__(self, config, op_data, crossover, mutation, selection, local_search=None, pso=None, selective_mutation=None, elite_ratio=0.1, ga_engines=None, island_mode=1, migration_frequency=10, initialization_mode='1', dataset_filename=None, initial_population=None, local_search_frequency=2, selective_mutation_frequency=10):
         self.config = config
         self.op_data = op_data
         self.crossover = crossover
@@ -52,6 +52,8 @@ class GAEngine:
         self.migration_frequency = migration_frequency
         self.dataset_filename = dataset_filename  # 새로운 인자 추가
         self.local_search_frequency = local_search_frequency  # 로컬 서치 주기 설정
+        self.selective_mutation_frequency = selective_mutation_frequency # selective_mutation 주기 설정
+
 
         if initialization_mode == '2':
             self.population = Population.from_mio(config, op_data, dataset_filename)
@@ -79,23 +81,23 @@ class GAEngine:
                 self.population.crossover(self.crossover)
                 self.population.mutate(self.mutation)
 
-                # Selective Mutation 적용
-                if self.selective_mutation:
-                    print('Selective Mutation 전반부 적용')
-                    self.selective_mutation.mutate(self.population.individuals, self.config)
-
                 # # Elitism: 최상의 해를 새로운 Population에 추가합니다.(Population 초기 갯수 몇개 대체)
                 # self.population.individuals[:num_elites] = elites
 
-                # # Elitism: 최악의 해를 최상의 해로 대체합니다.
-                # sorted_population = sorted(self.population.individuals, key=lambda ind: ind.fitness)
-                # self.population.individuals[-num_elites:] = elites
+                # Elitism: 최악의 해를 최상의 해로 대체합니다.
+                sorted_population = sorted(self.population.individuals, key=lambda ind: ind.fitness)
+                self.population.individuals[-num_elites:] = elites
 
-                # Elitism: 최상의 해를 새로운 Population에 랜덤하게 추가합니다.
-                for elite in elites:
-                    random_index = random.randint(0, len(self.population.individuals) - 1)
-                    self.population.individuals[random_index] = elite
+                # # Elitism: 최상의 해를 새로운 Population에 랜덤하게 추가합니다.
+                # for elite in elites:
+                #     random_index = random.randint(0, len(self.population.individuals) - 1)
+                #     self.population.individuals[random_index] = elite
 
+                # Selective Mutation 적용
+                if generation > 0 and self.selective_mutation and generation % self.selective_mutation_frequency == 0:
+                    print('Selective Mutation 전반부 적용')
+                    self.selective_mutation.mutate(self.population.individuals, self.config)
+                    
                 print(f"Generation {generation} evaluated")
                 current_best = min(self.population.individuals, key=lambda ind: ind.makespan)
                 if current_best.makespan < best_fitness:
@@ -133,6 +135,14 @@ class GAEngine:
                         # Local Search 후 염색체, makespan, fitness 출력
                         # print(f"After Local Search - Individual: {optimized_ind.seq}, Makespan: {optimized_ind.makespan}, Fitness: {optimized_ind.fitness}")
 
+                # # 모든 generation 완료 후 PSO 진행
+                # if self.pso:
+                #     print("Applying PSO after all generations")
+                #     for i in range(len(self.population.individuals)):
+                #         individual = self.population.individuals[i]
+                #         optimized_ind = self.apply_pso(individual)
+                #         self.population.individuals[i] = optimized_ind
+
                 # # Selective Mutation 적용
                 # if self.selective_mutation:
                 #     print('Selective Mutation 후반부 적용')
@@ -143,11 +153,12 @@ class GAEngine:
                     print(f"Stopping early as best makespan {best_individual.makespan} is below target {self.config.target_makespan}.")
                     break
 
-            # Apply PSO to each individual in the population
+            # 모든 generation 완료 후 PSO 진행
             if self.pso:
                 print("Applying PSO after all generations")
                 for i in range(len(self.population.individuals)):
-                    optimized_ind = self.pso.optimize(self.population.individuals[i], self.config)
+                    individual = self.population.individuals[i]
+                    optimized_ind = self.apply_pso(individual)
                     self.population.individuals[i] = optimized_ind
 
             end_time = time.time()
@@ -169,6 +180,13 @@ class GAEngine:
             improved_individual = method.optimize(best_individual, self.config)
             if improved_individual.makespan < best_individual.makespan:
                 best_individual = improved_individual
+        return best_individual
+
+    def apply_pso(self, individual):
+        best_individual = copy.deepcopy(individual)
+        optimized_individual = self.pso.optimize(best_individual, self.config)
+        if optimized_individual.makespan < best_individual.makespan:
+            best_individual = optimized_individual
         return best_individual
 
     def save_csv(self, all_generations, execution_time, file_path):

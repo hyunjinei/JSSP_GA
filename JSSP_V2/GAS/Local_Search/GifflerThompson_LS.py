@@ -25,7 +25,7 @@ class GifflerThompson_LS:
             schedule = self.giffler_thompson(individual.seq, individual.op_data, config, rule)
             optimized_individual = self.create_new_individual(individual, schedule, config)
             optimized_individual.calculate_fitness(config.target_makespan)
-            # print(f"Rule {rule} fitness: {optimized_individual.fitness}")
+            print(f"Rule {rule} fitness: {optimized_individual.fitness}")
 
             if optimized_individual.fitness > best_fitness:
                 best_fitness = optimized_individual.fitness

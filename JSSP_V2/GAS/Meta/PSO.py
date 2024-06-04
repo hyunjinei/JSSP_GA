@@ -12,12 +12,10 @@ class PSO:
 
     def optimize(self, individual, config):
         print("PSO 시작")
-
-        # Initialize particles
-        particles = [copy.deepcopy(individual) for _ in range(self.num_particles)]
+        particles = [self.create_new_individual(individual, individual.seq, config) for _ in range(self.num_particles)]
         velocities = [np.random.uniform(-1, 1, len(individual.seq)) for _ in range(self.num_particles)]
         personal_best_positions = [copy.deepcopy(p.seq) for p in particles]
-        personal_best_fitness = [p.calculate_fitness(config.target_makespan) for p in particles]
+        personal_best_fitness = [p.fitness for p in particles]
         
         global_best_particle = min(particles, key=lambda p: p.fitness)
         global_best_position = global_best_particle.seq[:]
@@ -33,27 +31,32 @@ class PSO:
                                  self.c2 * r2 * (np.array(global_best_position) - np.array(particles[i].seq)))
                 velocities[i] = np.clip(velocities[i], -1, 1)
                 
-                particles[i].seq = np.array(particles[i].seq) + velocities[i]
-                particles[i].seq = np.clip(particles[i].seq, 0, len(individual.seq) - 1)
-                particles[i].seq = particles[i].seq.astype(int).tolist()
-
-                # 시퀀스 유효성 검사 및 수정
-                particles[i].seq = self.ensure_valid_sequence(particles[i].seq, config)
+                new_seq = (np.array(particles[i].seq) + velocities[i]).astype(int).tolist()
+                new_seq = self.ensure_valid_sequence(new_seq, config)
 
                 # 새로운 개체 생성 및 평가
-                new_individual = self.create_new_individual(particles[i], particles[i].seq, config)
-                fitness = new_individual.fitness
-                
-                if fitness < personal_best_fitness[i]:
-                    personal_best_positions[i] = particles[i].seq[:]
-                    personal_best_fitness[i] = fitness
+                new_individual = self.create_new_individual(particles[i], new_seq, config)
+                new_individual.calculate_fitness(config.target_makespan)
 
-                if fitness < global_best_fitness:
+                # Personal best 업데이트
+                if new_individual.fitness < personal_best_fitness[i]:
+                    personal_best_positions[i] = new_individual.seq[:]
+                    personal_best_fitness[i] = new_individual.fitness
+
+                # Global best 업데이트
+                if new_individual.fitness < global_best_fitness:
                     global_best_particle = copy.deepcopy(new_individual)
-                    global_best_position = particles[i].seq[:]
-                    global_best_fitness = fitness
+                    global_best_position = new_individual.seq[:]
+                    global_best_fitness = new_individual.fitness
 
-            print(f"Iteration {iteration}: Global best fitness = {global_best_fitness}")
+                # 파티클 업데이트
+                particles[i] = new_individual
+
+            current_best_particle = min(particles, key=lambda p: p.fitness)
+            current_best_fitness = current_best_particle.fitness
+            # print(f"Iteration {iteration}: Current best fitness = {current_best_fitness}, Global best fitness = {global_best_fitness}")
+            for i, p in enumerate(particles):
+                print(f"Particle {i}: Sequence = {p.seq}, Makespan = {p.makespan}, Fitness = {p.fitness}")
 
         print("PSO 종료")
         return global_best_particle
@@ -69,20 +72,17 @@ class PSO:
         return new_individual
 
     def ensure_valid_sequence(self, seq, config):
-        # JSSP의 제약조건을 반영하여 유효한 시퀀스를 생성하는 로직 추가
         num_jobs = config.n_job
         num_machines = config.n_machine
         job_counts = {job: 0 for job in range(num_jobs)}
         valid_seq = []
 
-        # 각 작업이 모든 기계에서 한번씩 수행되는지 확인
         for operation in seq:
             job = operation // num_machines
             if job_counts[job] < num_machines:
                 valid_seq.append(job * num_machines + job_counts[job])
                 job_counts[job] += 1
 
-        # 누락된 작업 추가
         for job in range(num_jobs):
             while job_counts[job] < num_machines:
                 valid_seq.append(job * num_machines + job_counts[job])

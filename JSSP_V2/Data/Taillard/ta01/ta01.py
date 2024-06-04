@@ -7,7 +7,7 @@ from GA_pyGAD.GA import Individual
 class Dataset:
     def __init__(self):
         self.name = 'ta01'
-        self.path = 'Data\\Taillard\\ta01\\'
+        self.path = 'Taillard\\ta01\\'
         if __name__ == "__main__":
             file_path = os.path.join(os.getcwd(),'ta01.txt')
         else:

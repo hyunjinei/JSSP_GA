@@ -92,7 +92,7 @@ def main():
     file = 'la02.txt'
 
     dataset = Dataset(file)
-    config = Run_Config(n_job=10, n_machine=5, n_op=50, population_size=200, generations=200, 
+    config = Run_Config(n_job=10, n_machine=5, n_op=50, population_size=200, generations=400, 
                         print_console=False, save_log=True, save_machinelog=True, 
                         show_gantt=False, save_gantt=True, show_gui=False,
                         trace_object='Process4', title='Gantt Chart for JSSP',
@@ -146,9 +146,14 @@ def main():
     '''
 # InsertionMutation
     custom_settings = [
-        {'crossover': PMXCrossover, 'pc': 0.8, 'mutation': SwapMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [SimulatedAnnealing()], 'pso': None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.3)},
-        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [GifflerThompson_LS(priority_rule=None)], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.3)}
+        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [GifflerThompson_LS(priority_rule=None), SimulatedAnnealing()], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
+        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [SimulatedAnnealing(),GifflerThompson_LS(priority_rule=None)], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
+        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [GifflerThompson_LS(priority_rule=None)], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
+        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [GifflerThompson_LS(priority_rule=None)], 'pso':  PSO(num_particles=10, num_iterations=50), 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
+        {'crossover': OBC, 'pc': 0.8, 'mutation': ReciprocalExchangeMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [SimulatedAnnealing(), GifflerThompson_LS(priority_rule=None)], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.8, pm_low=0.01, rank_divide=0.3)},
+        {'crossover': SXX, 'pc': 0.8, 'mutation': SwapMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [SimulatedAnnealing(), GifflerThompson_LS(priority_rule=None)], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.8, pm_low=0.01, rank_divide=0.5)},
     ]
+# GifflerThompson_LS(priority_rule=None)
 # GifflerThompson_LS(priority_rule=None), SimulatedAnnealing()
     ga_engines = []
     for i, setting in enumerate(custom_settings):
@@ -166,15 +171,16 @@ def main():
         selection = selection_instance
         pso = pso_class if pso_class else None  # pso 인스턴스 생성
         local_search = local_search_methods
-        local_search_frequency = 50  # 100세대마다 로컬 서치를 수행하도록 설정
+        local_search_frequency = 180  # 100세대마다 로컬 서치를 수행하도록 설정
+        selective_mutation_frequency = 20 # 20세대마다 SelectiveMutation를 수행하도록 설정
         selective_mutation = selective_mutation_instance  # SelectiveMutation 인스턴스 생성
         
         if initialization_mode == '1':
-            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso,selective_mutation, elite_ratio=0.1, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, local_search_frequency=local_search_frequency))
+            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso,selective_mutation, elite_ratio=0.05, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, local_search_frequency=local_search_frequency, selective_mutation_frequency=selective_mutation_frequency))
         elif initialization_mode == '2':
-            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso,selective_mutation, elite_ratio=0.05, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, initialization_mode='2', dataset_filename=config.dataset_filename, local_search_frequency=local_search_frequency))
+            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso,selective_mutation, elite_ratio=0.05, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, initialization_mode='2', dataset_filename=config.dataset_filename, local_search_frequency=local_search_frequency, selective_mutation_frequency=selective_mutation_frequency))
         elif initialization_mode == '3':
-            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso,selective_mutation, elite_ratio=0.05, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, initialization_mode='3', dataset_filename=config.dataset_filename, local_search_frequency=local_search_frequency))
+            ga_engines.append(GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso,selective_mutation, elite_ratio=0.05, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, initialization_mode='3', dataset_filename=config.dataset_filename, local_search_frequency=local_search_frequency, selective_mutation_frequency=selective_mutation_frequency))
 
 
     best_individuals = [None] * len(ga_engines)  # Indexing issue fix
