@@ -69,7 +69,7 @@ abz5 = 1234  10, 10
 ft20 = 1165
 '''
 TARGET_MAKESPAN = 655  # 목표 Makespan
-MIGRATION_FREQUENCY = 100  # Migration frequency 설정
+MIGRATION_FREQUENCY = 45  # Migration frequency 설정
 
 # GA 엔진 실행 함수
 def run_ga_engine(ga_engine, index, elite=None):
@@ -90,9 +90,9 @@ def main():
     print(f"Selected Island-Parallel GA mode: {island_mode}")
 
     file = 'la02.txt'
-
+# 200 400
     dataset = Dataset(file)
-    config = Run_Config(n_job=10, n_machine=5, n_op=50, population_size=200, generations=400, 
+    config = Run_Config(n_job=10, n_machine=5, n_op=50, population_size=500, generations=100, 
                         print_console=False, save_log=True, save_machinelog=True, 
                         show_gantt=False, save_gantt=True, show_gui=False,
                         trace_object='Process4', title='Gantt Chart for JSSP',
@@ -146,15 +146,16 @@ def main():
     '''
 # InsertionMutation
     custom_settings = [
-        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [GifflerThompson_LS(priority_rule=None), SimulatedAnnealing()], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
+        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
         {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [SimulatedAnnealing(),GifflerThompson_LS(priority_rule=None)], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
-        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [GifflerThompson_LS(priority_rule=None)], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
-        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [GifflerThompson_LS(priority_rule=None)], 'pso':  PSO(num_particles=10, num_iterations=50), 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
-        {'crossover': OBC, 'pc': 0.8, 'mutation': ReciprocalExchangeMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [SimulatedAnnealing(), GifflerThompson_LS(priority_rule=None)], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.8, pm_low=0.01, rank_divide=0.3)},
-        {'crossover': SXX, 'pc': 0.8, 'mutation': SwapMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [SimulatedAnnealing(), GifflerThompson_LS(priority_rule=None)], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.8, pm_low=0.01, rank_divide=0.5)},
+        # {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [HillClimbing()], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
+        # {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [TabuSearch()], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
+        # {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [SimulatedAnnealing(),GifflerThompson_LS(priority_rule=None),HillClimbing()], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
+        # {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [SimulatedAnnealing(),GifflerThompson_LS(priority_rule=None),HillClimbing(),TabuSearch()], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
     ]
 # GifflerThompson_LS(priority_rule=None)
 # GifflerThompson_LS(priority_rule=None), SimulatedAnnealing()
+
     ga_engines = []
     for i, setting in enumerate(custom_settings):
         crossover_class = setting['crossover']
@@ -171,7 +172,7 @@ def main():
         selection = selection_instance
         pso = pso_class if pso_class else None  # pso 인스턴스 생성
         local_search = local_search_methods
-        local_search_frequency = 180  # 100세대마다 로컬 서치를 수행하도록 설정
+        local_search_frequency = 19  # 100세대마다 로컬 서치를 수행하도록 설정
         selective_mutation_frequency = 20 # 20세대마다 SelectiveMutation를 수행하도록 설정
         selective_mutation = selective_mutation_instance  # SelectiveMutation 인스턴스 생성
         

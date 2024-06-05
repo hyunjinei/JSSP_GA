@@ -85,13 +85,13 @@ class GAEngine:
                 # self.population.individuals[:num_elites] = elites
 
                 # Elitism: 최악의 해를 최상의 해로 대체합니다.
-                sorted_population = sorted(self.population.individuals, key=lambda ind: ind.fitness)
-                self.population.individuals[-num_elites:] = elites
+                # sorted_population = sorted(self.population.individuals, key=lambda ind: ind.fitness)
+                # self.population.individuals[-num_elites:] = elites
 
-                # # Elitism: 최상의 해를 새로운 Population에 랜덤하게 추가합니다.
-                # for elite in elites:
-                #     random_index = random.randint(0, len(self.population.individuals) - 1)
-                #     self.population.individuals[random_index] = elite
+                # Elitism: 최상의 해를 새로운 Population에 랜덤하게 추가합니다.
+                for elite in elites:
+                    random_index = random.randint(0, len(self.population.individuals) - 1)
+                    self.population.individuals[random_index] = elite
 
                 # Selective Mutation 적용
                 if generation > 0 and self.selective_mutation and generation % self.selective_mutation_frequency == 0:

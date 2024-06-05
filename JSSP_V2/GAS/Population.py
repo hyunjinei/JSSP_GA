@@ -126,47 +126,77 @@ class JSSP:
 
 class GifflerThompson:
     def __init__(self, priority_rules=None):
-        if priority_rules is None:
-            self.priority_rules = ['SPT', 'LPT', 'MWR', 'LWR', 'MOR', 'LOR', 'EDD']
-        else:
-            self.priority_rules = priority_rules
+        self.priority_rules = ['SPT', 'LPT', 'MWR', 'LWR', 'MOR', 'LOR', 'EDD']
+        self.default_priority_rule = priority_rules if priority_rules else 'basic'
 
     def optimize(self, individual, config):
-        selected_rule = random.choice(self.priority_rules)
-        schedule = self.giffler_thompson(individual.seq, individual.op_data, config, selected_rule)
-        optimized_individual = copy.deepcopy(individual)
-        optimized_individual.seq = schedule
-        optimized_individual.calculate_fitness(config.target_makespan)
-        return optimized_individual
+        best_individual = copy.deepcopy(individual)
+        best_individual.calculate_fitness(config.target_makespan)
+        best_rule = "basic"
 
-    def giffler_thompson(self, seq, op_data, config, rule):
-        sorted_seq = self.apply_priority_rule(seq, op_data, config, rule)
-        return sorted_seq
+        # 기본 우선순위 규칙 적용 결과
+        default_schedule = self.giffler_thompson(individual.seq, individual.op_data, config, self.default_priority_rule)
+        default_individual = self.create_new_individual(individual, default_schedule, config)
+        default_individual.calculate_fitness(config.target_makespan)
+        # print(f"Default rule (basic) fitness: {default_individual.fitness}")
 
-    def apply_priority_rule(self, seq, op_data, config, rule):
+        best_fitness = default_individual.fitness
+        best_individuals = [(default_individual, "basic")]
+
+        # 모든 우선순위 규칙 적용 결과 비교
+        for rule in self.priority_rules:
+            schedule = self.giffler_thompson(individual.seq, individual.op_data, config, rule)
+            optimized_individual = self.create_new_individual(individual, schedule, config)
+            optimized_individual.calculate_fitness(config.target_makespan)
+            # print(f"Rule {rule} fitness: {optimized_individual.fitness}")
+
+            if optimized_individual.fitness > best_fitness:
+                best_fitness = optimized_individual.fitness
+                best_individuals = [(optimized_individual, rule)]
+                best_rule = rule
+            elif optimized_individual.fitness == best_fitness:
+                best_individuals.append((optimized_individual, rule))
+
+        selected_individual, selected_rule = random.choice(best_individuals)
+        print(f"Selected rule: {selected_rule}, Selected individual: {selected_individual}")
+        return selected_individual
+
+    def giffler_thompson(self, seq, op_data, config, priority_rule):
+        return self.apply_priority_rule(seq, op_data, config, priority_rule)
+
+    def apply_priority_rule(self, seq, op_data, config, priority_rule):
         def safe_get_op_data(x, idx):
             try:
                 return op_data[x // config.n_machine][x % config.n_machine][idx]
             except IndexError:
                 return float('inf') if idx == 1 else 0
 
-        if rule == 'SPT':
+        if priority_rule == 'SPT':
             sorted_seq = sorted(seq, key=lambda x: safe_get_op_data(x, 1))
-        elif rule == 'LPT':
+        elif priority_rule == 'LPT':
             sorted_seq = sorted(seq, key=lambda x: -safe_get_op_data(x, 1))
-        elif rule == 'MWR':
+        elif priority_rule == 'MWR':
             sorted_seq = sorted(seq, key=lambda x: -sum(safe_get_op_data(x, 1) for i in range(config.n_machine)))
-        elif rule == 'LWR':
+        elif priority_rule == 'LWR':
             sorted_seq = sorted(seq, key=lambda x: sum(safe_get_op_data(x, 1) for i in range(config.n_machine)))
-        elif rule == 'MOR':
+        elif priority_rule == 'MOR':
             sorted_seq = sorted(seq, key=lambda x: -len([op for op in op_data[x // config.n_machine] if op[1] > 0]))
-        elif rule == 'LOR':
+        elif priority_rule == 'LOR':
             sorted_seq = sorted(seq, key=lambda x: len([op for op in op_data[x // config.n_machine] if op[1] > 0]))
-        elif rule == 'EDD':
+        elif priority_rule == 'EDD':
             sorted_seq = sorted(seq, key=lambda x: safe_get_op_data(x, 2))
         else:
-            sorted_seq = seq  # Default to no sorting
+            sorted_seq = seq  # 기본값으로 정렬하지 않음
         return sorted_seq
+
+    def create_new_individual(self, individual, new_seq, config):
+        new_individual = copy.deepcopy(individual)
+        new_individual.seq = new_seq
+        new_individual.job_seq = new_individual.get_repeatable()
+        new_individual.feasible_seq = new_individual.get_feasible()
+        new_individual.machine_order = new_individual.get_machine_order()
+        new_individual.makespan, new_individual.mio_score = new_individual.evaluate(new_individual.machine_order)
+        return new_individual
 
 class Population:
     def __init__(self, config, op_data):
@@ -187,7 +217,11 @@ class Population:
     def from_giffler_thompson(cls, config, op_data, dataset_filename):
         dataset = Dataset(dataset_filename)
         giffler_thompson = GifflerThompson()
-        individuals = [Individual(config, seq=giffler_thompson.optimize(Individual(config, seq=random.sample(range(config.n_op), config.n_op), op_data=dataset.op_data), config).seq, op_data=dataset.op_data) for _ in range(config.population_size)]
+        individuals = []
+        for _ in range(config.population_size):
+            random_individual = Individual(config, seq=random.sample(range(config.n_op), config.n_op), op_data=dataset.op_data)
+            optimized_individual = giffler_thompson.optimize(random_individual, config)
+            individuals.append(optimized_individual)
         population = cls(config, dataset.op_data)
         population.individuals = individuals
         return population
