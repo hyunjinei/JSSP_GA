@@ -199,33 +199,24 @@ class GifflerThompson:
         return new_individual
 
 class Population:
-    def __init__(self, config, op_data, random_seed=None):
+    def __init__(self, config, op_data):
         self.config = config
         self.op_data = op_data
-        if random_seed is not None:
-            random.seed(random_seed)
-            np.random.seed(random_seed)        
         self.individuals = [Individual(config, seq=random.sample(range(config.n_op), config.n_op), op_data=op_data) for _ in range(config.population_size)]
 
     @classmethod
-    def from_mio(cls, config, op_data, dataset_filename, random_seed=None):
+    def from_mio(cls, config, op_data, dataset_filename):
         dataset = Dataset(dataset_filename)
         jssp = JSSP(dataset)
-        if random_seed is not None:
-            random.seed(random_seed)
-            np.random.seed(random_seed)
         individuals = [Individual(config, seq=jssp.get_seq(), op_data=dataset.op_data) for _ in range(config.population_size)]
         population = cls(config, dataset.op_data)  # Create the Population instance with required arguments
         population.individuals = individuals
         return population
 
     @classmethod
-    def from_giffler_thompson(cls, config, op_data, dataset_filename, random_seed=None):
+    def from_giffler_thompson(cls, config, op_data, dataset_filename):
         dataset = Dataset(dataset_filename)
         giffler_thompson = GifflerThompson()
-        if random_seed is not None:
-            random.seed(random_seed)
-            np.random.seed(random_seed)
         individuals = []
         for _ in range(config.population_size):
             random_individual = Individual(config, seq=random.sample(range(config.n_op), config.n_op), op_data=dataset.op_data)

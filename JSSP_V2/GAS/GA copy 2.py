@@ -35,7 +35,7 @@ def migrate_top_10_percent(ga_engines, migration_order, island_mode):
             target_island.population.individuals[replacement_idx] = copy.deepcopy(best_individual)
 
 class GAEngine:
-    def __init__(self, config, op_data, crossover, mutation, selection, local_search=None, pso=None, selective_mutation=None, elite_ratio=0.1, ga_engines=None, island_mode=1, migration_frequency=10, initialization_mode='1', dataset_filename=None, initial_population=None, local_search_frequency=2, selective_mutation_frequency=10, random_seed=None):
+    def __init__(self, config, op_data, crossover, mutation, selection, local_search=None, pso=None, selective_mutation=None, elite_ratio=0.1, ga_engines=None, island_mode=1, migration_frequency=10, initialization_mode='1', dataset_filename=None, initial_population=None, local_search_frequency=2, selective_mutation_frequency=10):
         self.config = config
         self.op_data = op_data
         self.crossover = crossover
@@ -53,15 +53,14 @@ class GAEngine:
         self.dataset_filename = dataset_filename  # 새로운 인자 추가
         self.local_search_frequency = local_search_frequency  # 로컬 서치 주기 설정
         self.selective_mutation_frequency = selective_mutation_frequency # selective_mutation 주기 설정
-        self.random_seed = random_seed  # 랜덤 시드 설정
 
 
         if initialization_mode == '2':
-            self.population = Population.from_mio(config, op_data, dataset_filename, random_seed=random_seed)
+            self.population = Population.from_mio(config, op_data, dataset_filename)
         elif initialization_mode == '3':
-            self.population = Population.from_giffler_thompson(config, op_data, dataset_filename, random_seed=random_seed)
+            self.population = Population.from_giffler_thompson(config, op_data, dataset_filename)
         else:
-            self.population = Population(config, op_data, random_seed=random_seed)
+            self.population = Population(config, op_data)
 
     def evolve(self):
         try:
