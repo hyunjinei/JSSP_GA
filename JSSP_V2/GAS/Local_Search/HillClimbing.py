@@ -1,12 +1,11 @@
 import copy
-
+# 기존     def __init__(self, iterations=100):
 class HillClimbing:
-    def __init__(self, iterations=100):
+    def __init__(self, iterations=10):
         self.iterations = iterations
+        self.stop_search = False
 
     def optimize(self, individual, config):
-        # print("HillClimbing 시작")
-
         best_solution = copy.deepcopy(individual)
         best_makespan = individual.makespan
         iteration = 0
@@ -24,8 +23,13 @@ class HillClimbing:
             iteration += 1
             # print(f"Iteration {iteration} - Current Solution: {current_solution.seq}, Makespan: {current_makespan}, Fitness: {current_solution.fitness}")
 
-        print(f"HillClimbing 완료 - Optimized Individual: {best_solution.seq}, Makespan: {best_solution.makespan}, Fitness: {best_solution.fitness}")
+            # 목표 Makespan에 도달하면 Local Search 종료
+            if best_solution.fitness >= 1.0:
+                print(f"Stopping early as fitness {best_solution.fitness} is 1.0 or higher.")
+                self.stop_search = True
+                return best_solution
 
+        # print(f"HillClimbing 완료 - Optimized Individual: {best_solution.seq}, Makespan: {best_solution.makespan}, Fitness: {best_solution.fitness}")
         return best_solution
 
     def get_neighbors(self, individual, config):
@@ -36,7 +40,6 @@ class HillClimbing:
                 neighbor_seq = seq[:]
                 neighbor_seq[i], neighbor_seq[j] = neighbor_seq[j], neighbor_seq[i]
                 neighbor = self.create_new_individual(individual, neighbor_seq, config)
-                # print(f"Neighbor: {neighbor.seq}, Makespan: {neighbor.makespan}, Fitness: {neighbor.fitness}")
                 neighbors.append(neighbor)
         return neighbors
 

@@ -65,12 +65,13 @@ la08: 863  15, 5/  la18: 848   10, 10
 la09: 951  15, 5/  la19: 842   10, 10
 la10: 958  15, 5/  la20: 902   10, 10
 
+ta21: 1642 20 20 
 abz5 = 1234  10, 10
 ft20 = 1165
 '''
-TARGET_MAKESPAN = 655  # 목표 Makespan
+TARGET_MAKESPAN = 1642  # 목표 Makespan
 MIGRATION_FREQUENCY = 45  # Migration frequency 설정
-random_seed = 42 # Population 초기화시 일정하게 만들기 위함. None을 넣으면 아예 랜덤 생성(GA들끼리 같지않음)
+random_seed = None # Population 초기화시 일정하게 만들기 위함. None을 넣으면 아예 랜덤 생성(GA들끼리 같지않음)
 
 # GA 엔진 실행 함수
 def run_ga_engine(ga_engine, index, elite=None):
@@ -90,15 +91,15 @@ def main():
     island_mode = input("Select Island-Parallel GA mode (1: Independent, 2: Sequential Migration, 3: Random Migration): ")
     print(f"Selected Island-Parallel GA mode: {island_mode}")
 
-    file = 'la02.txt'
+    file = 'ta21.txt'
 # 200 400
     dataset = Dataset(file)
-    config = Run_Config(n_job=10, n_machine=5, n_op=50, population_size=500, generations=100, 
+    config = Run_Config(n_job=20, n_machine=20, n_op=400, population_size=500, generations=100, 
                         print_console=False, save_log=True, save_machinelog=True, 
                         show_gantt=False, save_gantt=True, show_gui=False,
                         trace_object='Process4', title='Gantt Chart for JSSP',
-                        tabu_search_iterations=100, hill_climbing_iterations=100, simulated_annealing_iterations=100)
-                        
+                        tabu_search_iterations=10, hill_climbing_iterations=10, simulated_annealing_iterations=10)
+# 기존 tabu_search_iterations=10, hill_climbing_iterations=10, simulated_annealing_iterations=10                  
     config.dataset_filename = file  # dataset 파일명 설정
 
     config.target_makespan = TARGET_MAKESPAN
@@ -147,9 +148,9 @@ def main():
     '''
 # InsertionMutation
     custom_settings = [
-        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [SimulatedAnnealing(),GifflerThompson_LS(priority_rule=None)], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
+        # {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [SimulatedAnnealing(),GifflerThompson_LS(priority_rule=None)], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
         {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [SimulatedAnnealing(),HillClimbing(),GifflerThompson_LS(priority_rule=None)], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
-        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [SimulatedAnnealing(),HillClimbing(),TabuSearch(),GifflerThompson_LS(priority_rule=None)], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
+        # {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [SimulatedAnnealing(),HillClimbing(),TabuSearch(),GifflerThompson_LS(priority_rule=None)], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
 
         # {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [HillClimbing()], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
         # {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [TabuSearch()], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
@@ -175,7 +176,7 @@ def main():
         selection = selection_instance
         pso = pso_class if pso_class else None  # pso 인스턴스 생성
         local_search = local_search_methods
-        local_search_frequency = 19  # 100세대마다 로컬 서치를 수행하도록 설정
+        local_search_frequency = 40  # 100세대마다 로컬 서치를 수행하도록 설정
         selective_mutation_frequency = 20 # 20세대마다 SelectiveMutation를 수행하도록 설정
         selective_mutation = selective_mutation_instance  # SelectiveMutation 인스턴스 생성
         

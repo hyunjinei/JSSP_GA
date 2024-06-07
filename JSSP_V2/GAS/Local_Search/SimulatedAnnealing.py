@@ -8,6 +8,7 @@ class SimulatedAnnealing:
         self.cooling_rate = cooling_rate
         self.min_temp = min_temp
         self.iterations = iterations
+        self.stop_search = False  # 종료 조건 플래그 추가
 
     def optimize(self, individual, config):
         # print(f"Simulated Annealing 시작 - Initial Individual: {individual.seq}, Makespan: {individual.makespan}, Fitness: {individual.fitness}")
@@ -34,6 +35,12 @@ class SimulatedAnnealing:
             temp *= self.cooling_rate
             iteration += 1
             # print(f"Iteration {iteration} - Temperature: {temp}, Current Makespan: {current_makespan}, Best Makespan: {best_makespan}")
+
+            # 목표 Makespan에 도달하면 Local Search 종료
+            if best_solution.fitness >= 1.0:
+                print(f"Stopping early as fitness {best_solution.fitness} is 1.0 or higher.")
+                self.stop_search = True
+                break
 
         # print(f"Simulated Annealing 완료 - Optimized Individual: {best_solution.seq}, Makespan: {best_solution.makespan}, Fitness: {best_solution.fitness}")
         return best_solution

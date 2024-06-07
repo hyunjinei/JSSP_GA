@@ -13,6 +13,9 @@ from Local_Search.TabuSearch import TabuSearch
 from Data.Dataset.Dataset import Dataset
 from Meta.PSO import PSO  # PSO를 추가합니다
 from GAS.Mutation.SelectiveMutation import SelectiveMutation
+from Local_Search.HillClimbing import HillClimbing  # import 추가
+from Local_Search.SimulatedAnnealing import SimulatedAnnealing
+from Local_Search.GifflerThompson_LS import GifflerThompson_LS
 
 # migrate_top_10_percent 함수 정의
 def migrate_top_10_percent(ga_engines, migration_order, island_mode):
@@ -54,6 +57,8 @@ class GAEngine:
         self.local_search_frequency = local_search_frequency  # 로컬 서치 주기 설정
         self.selective_mutation_frequency = selective_mutation_frequency # selective_mutation 주기 설정
         self.random_seed = random_seed  # 랜덤 시드 설정
+        # 상위 10% 개체에만 Local Search 적용
+        self.local_search_top_percentage = 0.1  
 
 
         if initialization_mode == '2':
@@ -72,6 +77,7 @@ class GAEngine:
 
             for generation in range(self.config.generations):
                 print(f"Evaluating generation {generation}")
+                                
                 self.population.evaluate(self.config.target_makespan)  # Ensure target_makespan is passed
 
                 # Elitism: 최상의 해를 보존합니다.
@@ -112,6 +118,11 @@ class GAEngine:
                 generation_data = [(ind.seq, ind.makespan) for ind in self.population.individuals]
                 all_generations.append((generation, generation_data))
 
+                # 목표 Makespan에 도달하면 멈춤
+                if best_individual is not None and best_individual.makespan <= self.config.target_makespan:
+                    print(f"Stopping early as best makespan {best_individual.makespan} is below target {self.config.target_makespan}.")
+                    break
+
                 # Migration 수행
                 if self.migration_frequency and (generation + 1) % self.migration_frequency == 0 and self.ga_engines:
                     print(f"Preparing for migration at generation {generation + 1}")
@@ -123,36 +134,46 @@ class GAEngine:
                         print(f"Migration 중 (랜덤) at generation {generation + 1}")
                         migration_order = random.sample(range(len(self.ga_engines)), len(self.ga_engines))
                         migrate_top_10_percent(self.ga_engines, migration_order, self.island_mode)
+# 로컬서치 원본
+                # # Apply local search at specified frequency
+                # if generation > 0 and generation % self.local_search_frequency == 0:
+                #     print("Applying local search")
+                #     stop_search = False
+                #     for method in self.local_search_methods:
+                #         if stop_search:
+                #             break                        
+                #         for i in range(len(self.population.individuals)):
+                #             individual = self.population.individuals[i]
+                #             optimized_ind = self.apply_local_search(individual)
+                #             # Local Search 전 염색체, makespan, fitness 출력
+                #             # print(f"Before Local Search - Individual: {individual.seq}, Makespan: {individual.makespan}, Fitness: {individual.fitness}")
+                #             self.population.individuals[i] = optimized_ind
+                #             # Local Search 후 염색체, makespan, fitness 출력
+                #             # print(f"After Local Search - Individual: {optimized_ind.seq}, Makespan: {optimized_ind.makespan}, Fitness: {optimized_ind.fitness}")
+                #             if hasattr(method, 'stop_search') and method.stop_search:
+                #                 stop_search = True
+                #                 break
 
-                # Apply local search at specified frequency
+                # Apply local search at specified frequency and only to top individuals
                 if generation > 0 and generation % self.local_search_frequency == 0:
                     print("Applying local search")
-                    for i in range(len(self.population.individuals)):
-                        individual = self.population.individuals[i]
-                        optimized_ind = self.apply_local_search(individual)
-                        # Local Search 전 염색체, makespan, fitness 출력
-                        # print(f"Before Local Search - Individual: {individual.seq}, Makespan: {individual.makespan}, Fitness: {individual.fitness}")
-                        self.population.individuals[i] = optimized_ind
-                        # Local Search 후 염색체, makespan, fitness 출력
-                        # print(f"After Local Search - Individual: {optimized_ind.seq}, Makespan: {optimized_ind.makespan}, Fitness: {optimized_ind.fitness}")
-
-                # # 모든 generation 완료 후 PSO 진행
-                # if self.pso:
-                #     print("Applying PSO after all generations")
-                #     for i in range(len(self.population.individuals)):
-                #         individual = self.population.individuals[i]
-                #         optimized_ind = self.apply_pso(individual)
-                #         self.population.individuals[i] = optimized_ind
-
-                # # Selective Mutation 적용
-                # if self.selective_mutation:
-                #     print('Selective Mutation 후반부 적용')
-                #     self.selective_mutation.mutate(self.population.individuals, self.config)
-
-                # 목표 Makespan에 도달하면 멈춤
-                if best_individual.makespan <= self.config.target_makespan:
-                    print(f"Stopping early as best makespan {best_individual.makespan} is below target {self.config.target_makespan}.")
-                    break
+                    stop_search = False
+                    top_individuals = sorted(self.population.individuals, key=lambda ind: ind.fitness, reverse=True)[:int(len(self.population.individuals) * self.local_search_top_percentage)]
+                    for method in self.local_search_methods:
+                        if stop_search:
+                            break
+                        for individual in top_individuals:
+                            optimized_ind = method.optimize(individual, self.config)
+                            self.population.individuals[self.population.individuals.index(individual)] = optimized_ind
+                            if optimized_ind.fitness >= 1.0:
+                                print(f"Stopping early as fitness {optimized_ind.fitness} is 1.0 or higher.")
+                                stop_search = True
+                                break
+                            
+                # # 목표 Makespan에 도달하면 멈춤
+                # if best_individual.makespan <= self.config.target_makespan:
+                #     print(f"Stopping early as best makespan {best_individual.makespan} is below target {self.config.target_makespan}.")
+                #     break
 
             # 모든 generation 완료 후 PSO 진행
             if self.pso:

@@ -158,7 +158,7 @@ class GifflerThompson:
                 best_individuals.append((optimized_individual, rule))
 
         selected_individual, selected_rule = random.choice(best_individuals)
-        print(f"Selected rule: {selected_rule}, Selected individual: {selected_individual}")
+        # print(f"Selected rule: {selected_rule}, Selected individual: {selected_individual}")
         return selected_individual
 
     def giffler_thompson(self, seq, op_data, config, priority_rule):

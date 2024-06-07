@@ -5,6 +5,7 @@ class GifflerThompson_LS:
     def __init__(self, priority_rule=None):
         self.priority_rules = ['SPT', 'LPT', 'MWR', 'LWR', 'MOR', 'LOR', 'EDD']
         self.default_priority_rule = priority_rule
+        self.stop_search = False  # 종료 조건 플래그 추가
 
     def optimize(self, individual, config):
         best_individual = copy.deepcopy(individual)
@@ -25,7 +26,7 @@ class GifflerThompson_LS:
             schedule = self.giffler_thompson(individual.seq, individual.op_data, config, rule)
             optimized_individual = self.create_new_individual(individual, schedule, config)
             optimized_individual.calculate_fitness(config.target_makespan)
-            print(f"Rule {rule} fitness: {optimized_individual.fitness}")
+            # print(f"Rule {rule} fitness: {optimized_individual.fitness}")
 
             if optimized_individual.fitness > best_fitness:
                 best_fitness = optimized_individual.fitness
@@ -36,6 +37,12 @@ class GifflerThompson_LS:
 
         selected_individual, selected_rule = random.choice(best_individuals)
         # print(f"Selected rule: {selected_rule}, Selected individual: {selected_individual}")
+        
+        # 목표 Makespan에 도달하면 Local Search 종료
+        if selected_individual.fitness >= 1.0:
+            print(f"Stopping early as fitness {selected_individual.fitness} is 1.0 or higher.")
+            self.stop_search = True
+
         return selected_individual
 
     def giffler_thompson(self, seq, op_data, config, priority_rule):
