@@ -13,7 +13,7 @@ class TabuSearch:
 
     def optimize(self, individual, config):
         # print(f"Tabu Search 시작")
-        # print(f"Tabu Search 시작 - Initial Individual: {individual.seq}, Makespan: {individual.makespan}, Fitness: {individual.fitness}")
+        print(f"Tabu Search 시작 - Initial Individual: {individual.seq}, Makespan: {individual.makespan}, Fitness: {individual.fitness}")
         best_solution = copy.deepcopy(individual)
         best_makespan = individual.makespan
         tabu_list = []
@@ -38,7 +38,7 @@ class TabuSearch:
             tabu_list.append(copy.deepcopy(current_solution.seq))
             if len(tabu_list) > self.tabu_tenure:
                 tabu_list.pop(0)
-            # print(f"Iteration {iteration + 1} - Current Best Makespan: {best_makespan}, Fitness: {best_solution.fitness}")
+            print(f"Iteration {iteration + 1} - Current Best Makespan: {best_makespan}, Fitness: {best_solution.fitness}")
 
             # 목표 Makespan에 도달하면 Local Search 종료
             if best_solution.fitness >= 1.0:
@@ -48,7 +48,7 @@ class TabuSearch:
 
         # 최적화 후 염색체, makespan, fitness 출력
         # print(f"Tabu Search 완료")
-        # print(f"Tabu Search 완료 - Optimized Individual: {best_solution.seq}, Makespan: {best_solution.makespan}, Fitness: {best_solution.fitness}")
+        print(f"Tabu Search 완료 - Optimized Individual: {best_solution.seq}, Makespan: {best_solution.makespan}, Fitness: {best_solution.fitness}")
         return best_solution
 
     def get_neighbors(self, individual, config):

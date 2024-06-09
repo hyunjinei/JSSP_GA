@@ -6,6 +6,7 @@ class HillClimbing:
         self.stop_search = False
 
     def optimize(self, individual, config):
+        print(f"HillClimbing 시작 - Initial Individual: {individual.seq}, Makespan: {individual.makespan}, Fitness: {individual.fitness}")        
         best_solution = copy.deepcopy(individual)
         best_makespan = individual.makespan
         iteration = 0
@@ -21,7 +22,7 @@ class HillClimbing:
             best_solution = current_solution
             best_makespan = current_makespan
             iteration += 1
-            # print(f"Iteration {iteration} - Current Solution: {current_solution.seq}, Makespan: {current_makespan}, Fitness: {current_solution.fitness}")
+            print(f"Iteration {iteration} - Current Solution: {current_solution.seq}, Makespan: {current_makespan}, Fitness: {current_solution.fitness}")
 
             # 목표 Makespan에 도달하면 Local Search 종료
             if best_solution.fitness >= 1.0:
@@ -29,7 +30,7 @@ class HillClimbing:
                 self.stop_search = True
                 return best_solution
 
-        # print(f"HillClimbing 완료 - Optimized Individual: {best_solution.seq}, Makespan: {best_solution.makespan}, Fitness: {best_solution.fitness}")
+        print(f"HillClimbing 완료 - Optimized Individual: {best_solution.seq}, Makespan: {best_solution.makespan}, Fitness: {best_solution.fitness}")
         return best_solution
 
     def get_neighbors(self, individual, config):

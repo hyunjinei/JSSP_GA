@@ -10,7 +10,8 @@ class Run_Config:
                  save_gantt=False,
                  show_gui=False,
                  trace_object='Process4', title=None,
-                 tabu_search_iterations=100, hill_climbing_iterations=100, simulated_annealing_iterations=100):
+                 tabu_search_iterations=100, hill_climbing_iterations=100, simulated_annealing_iterations=100,
+                 ga_index=0):
 
         self.n_job = n_job
         self.n_machine = n_machine
@@ -54,15 +55,8 @@ class Run_Config:
         now = datetime.datetime.now()
         self.now = now.strftime('%Y-%m-%d-%H-%M-%S')
         self.filename = {
-            'log': os.path.join(self.save_path, self.now + '.csv'),
-            'machine': os.path.join(self.save_path, self.now + '_machine.csv'),
-            'gantt': os.path.join(self.save_path, self.now + '.png'),
-            'csv': os.path.join(ga_generations_path, self.now + '.csv')  # 추가된 부분
+            'log': os.path.join(self.save_path, f'GA{ga_index}_{self.now}.csv'),
+            'machine': os.path.join(self.save_path, f'GA{ga_index}_{self.now}_machine.csv'),
+            'gantt': os.path.join(self.save_path, f'GA{ga_index}_{self.now}.png'),
+            'csv': os.path.join(ga_generations_path, f'GA{ga_index}_{self.now}.csv')  # 추가된 부분
         }
-
-
-
-        # 원본
-        # self.filename = {'log': self.now + '.csv',
-        #                  'machine':self.now+'_machine.csv',
-        #                  'gantt':self.now+'.png'}
