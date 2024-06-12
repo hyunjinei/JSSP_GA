@@ -63,6 +63,7 @@ class Individual:
 
     def __str__(self):
         return f"Individual(makespan={self.makespan}, fitness={self.fitness})"
+        # return f"Individual(seq={self.seq}, makespan={self.makespan}, fitness={self.fitness})"
 
     def calculate_fitness(self, target_makespan):
         if self.makespan == 0:

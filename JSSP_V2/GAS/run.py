@@ -78,7 +78,7 @@ ft20 = 1165
 '''
 
 TARGET_MAKESPAN = 597  # 목표 Makespan
-MIGRATION_FREQUENCY = 2  # Migration frequency 설정
+MIGRATION_FREQUENCY = 29  # Migration frequency 설정
 random_seed = 42  # Population 초기화시 일정하게 만들기 위함. None을 넣으면 아예 랜덤 생성(GA들끼리 같지않음)
 
 
@@ -90,9 +90,9 @@ def run_ga_engine(args):
         
         # GA 엔진 상태 출력
         print(f"GA{index+1} 상태:")
-        print(f"  Population: {ga_engine.population is not None}")
-        print(f"  Best Individual: {best is not None}")
-        print(f"  Current Generation: {sync_generation[index]}")
+        print(f"Population: {ga_engine.population is not None}")
+        print(f"Best Individual: {best is not None}")
+        print(f"Current Generation: {sync_generation[index]}")
         
         if best is None:
             return None
@@ -138,11 +138,11 @@ def main():
     print(f"Loading dataset from {file}...")  # 디버그 출력 추가
     dataset = Dataset(file)
 
-    base_config = Run_Config(n_job=10, n_machine=5, n_op=50, population_size=30, generations=100, 
+    base_config = Run_Config(n_job=10, n_machine=5, n_op=50, population_size=300, generations=150, 
                              print_console=False, save_log=True, save_machinelog=True, 
                              show_gantt=False, save_gantt=True, show_gui=False,
                              trace_object='Process4', title='Gantt Chart for JSSP',
-                             tabu_search_iterations=10, hill_climbing_iterations=10, simulated_annealing_iterations=10)
+                             tabu_search_iterations=10, hill_climbing_iterations=30, simulated_annealing_iterations=50)
     
     print("Base config created...")  # 디버그 출력 추가
 
@@ -166,11 +166,37 @@ def main():
 
     print("Result directories checked/created...")  # 디버그 출력 추가
 
+    '''
+    crossovers
+    [OrderCrossover, PMXCrossover, LOXCrossover, OBC, 
+    PositionBasedCrossover, SXX,PSXCrossover]  # Crossover 리스트
+    '''
+
+    '''
+    mutations 
+    [GeneralMutation, DisplacementMutation, InsertionMutation, 
+    ReciprocalExchangeMutation,ShiftMutation, InversionMutation, SwapMutation]
+    '''
+
+    '''
+    selection 
+    [TournamentSelection(), SeedSelection(), RouletteSelection()]
+    '''
+
+    '''
+    Local Search
+    [HillClimbing(), TabuSearch(), SimulatedAnnealing(), GifflerThompson()] # Local Search 리스트
+    GifflerThompson(priority_rule='SPT') -> SPT, LPT, MWR, LWR, MOR, LOR, EDD, FCFS, RANDOM
+    '''
+
+    '''
+    Meta Heuristic
+    ['pso': PSO(num_particles=10, num_iterations=50)], 'pso': None  # PSO 추가
+    '''
+
     custom_settings = [
-        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': SwapMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [SimulatedAnnealing(), GifflerThompson_LS(priority_rule=None)], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
-        {'crossover': PMXCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [SimulatedAnnealing(), GifflerThompson_LS(priority_rule=None)], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
-        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
-        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': SwapMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
+        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': SwapMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [SimulatedAnnealing(),HillClimbing()], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
+        {'crossover': PSXCrossover, 'pc': 0.8, 'mutation': ReciprocalExchangeMutation, 'pm': 0.1, 'selection': RouletteSelection(), 'local_search': [SimulatedAnnealing(),HillClimbing()], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
     ]
 
     ga_engines = []
@@ -200,7 +226,7 @@ def main():
         selection = selection_instance
         pso = pso_class if pso_class else None
         local_search = local_search_methods
-        local_search_frequency = 8
+        local_search_frequency = 130
         selective_mutation_frequency = 17
         selective_mutation = selective_mutation_instance
 

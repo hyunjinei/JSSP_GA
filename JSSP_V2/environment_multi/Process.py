@@ -1,8 +1,7 @@
-# Process.py
-
 import simpy
 from .Monitor import *
 
+# Process.py
 class Process(object):
     def __init__(self, _env, _name, _model, _monitor, _machine_order, config):
         self.config = config
@@ -38,30 +37,39 @@ class Process(object):
                 machine = self.model['M' + str(operation.machine)]
                 process_time = operation.process_time
 
-            yield machine.availability.put('using')
-            machine.add_reference(operation)
+            with machine.availability.request() as req:
+                yield req
+                machine.add_reference(operation, part.name)
 
-            # 로깅 추가: Started 이벤트
-            try:
-                self.monitor.record(self.env.now, self.name, machine='M' + str(operation.machine),
-                                    part_name=part.name, event="Started")
-            except Exception as e:
-                print(f"Error logging 'Started' event: {e}")
+                # 로깅 추가: Started 이벤트
+                try:
+                    self.monitor.record(self.env.now, self.name, machine='M' + str(operation.machine),
+                                        part_name=part.name, event="Started")
+                except Exception as e:
+                    print(f"Error logging 'Started' event: {e}")
 
-            yield self.env.timeout(process_time)
+                start_time = self.env.now
+                yield self.env.timeout(process_time)
+                end_time = self.env.now
 
-            # 로깅 추가: Finished 이벤트
-            try:
-                self.monitor.record(self.env.now, self.name, machine='M' + str(operation.machine),
-                                    part_name=part.name, event="Finished")
-            except Exception as e:
-                print(f"Error logging 'Finished' event: {e}")
+                # 로깅 추가: Finished 이벤트
+                try:
+                    self.monitor.record(self.env.now, self.name, machine='M' + str(operation.machine),
+                                        part_name=part.name, event="Finished")
+                except Exception as e:
+                    print(f"Error logging 'Finished' event: {e}")
 
-            machine.util_time += process_time
-            self.input_event.succeed()
+                machine.util_time += process_time
+                self.input_event.succeed()
 
-            yield self.out_part.put(part)
-            yield machine.availability.get()
+                # Update machine task times
+                for task in machine.tasks:
+                    if task["job_id"] == int(part.name.split('_')[0][4:]) and task["op_id"] == int(part.name.split('_')[1]):
+                        task["start_time"] = start_time
+                        task["end_time"] = end_time
+
+                yield self.out_part.put(part)
+
 
     def dispatch(self):
         while True:

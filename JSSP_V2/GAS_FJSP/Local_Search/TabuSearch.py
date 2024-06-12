@@ -1,28 +1,44 @@
+# Local_Search/TabuSearch.py
+
 import copy
-# 기존     def __init__(self, iterations=100):
-class HillClimbing:
-    def __init__(self, iterations=30):
+from collections import deque
+import random
+# 기존     def __init__(self, tabu_tenure=5, iterations=20, max_neighbors=10):
+class TabuSearch:
+    def __init__(self, tabu_tenure=5, iterations=10, max_neighbors=10):
+        self.tabu_tenure = tabu_tenure
         self.iterations = iterations
-        self.stop_search = False
+        self.max_neighbors = max_neighbors  # 최대 이웃 개수를 추가
+        self.stop_search = False  # 종료 조건 플래그 추가
 
     def optimize(self, individual, config):
-        print(f"HillClimbing 시작 - Initial Individual: {individual.seq}, Makespan: {individual.makespan}, Fitness: {individual.fitness}")        
+        # print(f"Tabu Search 시작")
+        # print(f"Tabu Search 시작 - Initial Individual: {individual.seq}, Makespan: {individual.makespan}, Fitness: {individual.fitness}")
         best_solution = copy.deepcopy(individual)
         best_makespan = individual.makespan
-        iteration = 0
+        tabu_list = []
+        tabu_list.append(copy.deepcopy(individual.seq))
 
-        while iteration < self.iterations:
-            neighbors = self.get_neighbors(best_solution, config)
+        for iteration in range(self.iterations):
+            neighbors = self.get_neighbors(individual, config)
+            # print(f"Iteration {iteration + 1} - Number of Neighbors: {len(neighbors)}")
+            neighbors = [n for n in neighbors if n.seq not in tabu_list]
+
+            if not neighbors:
+                # print("No valid neighbors found, terminating early.")
+                break
+
             current_solution = min(neighbors, key=lambda ind: ind.makespan)
             current_makespan = current_solution.makespan
 
-            if current_makespan >= best_makespan:
-                break
+            if current_makespan < best_makespan:
+                best_solution = copy.deepcopy(current_solution)
+                best_makespan = current_makespan
 
-            best_solution = current_solution
-            best_makespan = current_makespan
-            iteration += 1
-            print(f"Iteration {iteration} - Current Solution: {current_solution.seq}, Makespan: {current_makespan}, Fitness: {current_solution.fitness}")
+            tabu_list.append(copy.deepcopy(current_solution.seq))
+            if len(tabu_list) > self.tabu_tenure:
+                tabu_list.pop(0)
+            # print(f"Iteration {iteration + 1} - Current Best Makespan: {best_makespan}, Fitness: {best_solution.fitness}")
 
             # 목표 Makespan에 도달하면 Local Search 종료
             if best_solution.fitness >= 1.0:
@@ -30,7 +46,9 @@ class HillClimbing:
                 self.stop_search = True
                 return best_solution
 
-        print(f"HillClimbing 완료 - Optimized Individual: {best_solution.seq}, Makespan: {best_solution.makespan}, Fitness: {best_solution.fitness}")
+        # 최적화 후 염색체, makespan, fitness 출력
+        # print(f"Tabu Search 완료")
+        # print(f"Tabu Search 완료 - Optimized Individual: {best_solution.seq}, Makespan: {best_solution.makespan}, Fitness: {best_solution.fitness}")
         return best_solution
 
     def get_neighbors(self, individual, config):
@@ -38,9 +56,12 @@ class HillClimbing:
         seq = individual.seq
         for i in range(len(seq) - 1):
             for j in range(i + 1, len(seq)):
+                if len(neighbors) >= self.max_neighbors:  # 최대 이웃 개수 조건 추가
+                    return neighbors
                 neighbor_seq = seq[:]
                 neighbor_seq[i], neighbor_seq[j] = neighbor_seq[j], neighbor_seq[i]
                 neighbor = self.create_new_individual(individual, neighbor_seq, config)
+                # print(f"Neighbor: {neighbor.seq}, Makespan: {neighbor.makespan}, Fitness: {neighbor.fitness}")
                 neighbors.append(neighbor)
         return neighbors
 

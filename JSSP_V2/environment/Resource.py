@@ -1,3 +1,5 @@
+# Resource.py
+
 import simpy
 class Machine(object):
     def __init__(self, env, id):

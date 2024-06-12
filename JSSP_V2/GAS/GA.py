@@ -18,6 +18,7 @@ from Local_Search.SimulatedAnnealing import SimulatedAnnealing
 from Local_Search.GifflerThompson_LS import GifflerThompson_LS
 from multiprocessing import Pool, Manager, Event, Value, Array, Event
 import datetime
+# from Meta.ORtools import ORToolsOptimizer
 
 def migrate_top_10_percent(ga_engines, migration_order, island_mode):
     num_islands = len(ga_engines)
@@ -51,8 +52,9 @@ class GAEngine:
         self.local_search_frequency = local_search_frequency
         self.selective_mutation_frequency = selective_mutation_frequency
         self.random_seed = random_seed
-        self.local_search_top_percentage = 0.2  
+        self.local_search_top_percentage = 0.05  
         # self.new_populations = [[] for _ in range(len(ga_engines))]
+        # self.ortools_optimizer = ortools_optimizer
 
         if initialization_mode == '2':
             self.population = Population.from_mio(config, op_data, dataset_filename, random_seed=random_seed)
@@ -77,6 +79,11 @@ class GAEngine:
                 self.population.evaluate(self.config.target_makespan)
                 print(f"GA{index+1} Population: {self.population is not None}")
                 print(f"GA{index+1} Best Individual: {best_individual is not None}")
+
+                # # 여기에서 각 개체의 정보를 출력
+                # for ind in self.population.individuals:
+                #     print(ind)
+
                 num_elites = int(self.elite_ratio * len(self.population.individuals))
                 elites = sorted(self.population.individuals, key=lambda ind: ind.fitness, reverse=True)[:num_elites]
 
@@ -131,26 +138,68 @@ class GAEngine:
 
                     print(f"Migration order: {migration_order}")  # Migration order 출력
 
-                    # 현재 GA의 new_population 업데이트(5%)
-                    new_populations[index] = sorted(self.population.individuals, key=lambda ind: ind.fitness, reverse=True)[:max(1, len(self.population.individuals) // 10)]
+                    # 현재 GA의 new_population 업데이트(만약 Population size가 100이라면 //20을 하게 되면 5개를 고르는거임)
+                    new_populations[index] = sorted(self.population.individuals, key=lambda ind: ind.fitness, reverse=True)[:max(1, len(self.population.individuals) // 5)]
 
-                    # # 마이그레이션 수행 (현재 GA에 대해서만) 랜덤 삽입
-                    # for i in range(len(self.ga_engines)):
-                    #     if i != index:
-                    #         if new_populations[i]:
-                    #             for j in range(len(new_populations[i])):
-                    #                 self.population.individuals[random.randint(0, len(self.population.individuals) - 1)] = copy.deepcopy(new_populations[i][j])
-                    #             print(f"Migrating from GA{i+1} to GA{index+1}")
-
+                    # 마이그레이션 수행 (현재 GA에 대해서만) 랜덤 삽입
                     for i in range(len(self.ga_engines)):
-                        target_index = migration_order[i]
-                        if target_index != i:
-                            if new_populations[target_index]:
-                                # GA1의 최적 개체들을 덮어씌우기 위해 GA1의 최적 개체들 인덱스를 선택
-                                elites_indices = sorted(range(len(self.ga_engines[i].population.individuals)), key=lambda idx: self.ga_engines[i].population.individuals[idx].fitness, reverse=True)[:len(new_populations[target_index])]
-                                for j in range(len(new_populations[target_index])):
-                                    self.ga_engines[i].population.individuals[elites_indices[j]] = copy.deepcopy(new_populations[target_index][j])
-                                print(f"Migrating from GA{i+1} to GA{target_index+1}")
+                        if i != index:
+                            if new_populations[index]:  # Source population should be from `index` not `i`
+                                for j in range(len(new_populations[index])):
+                                    migrating_individual = copy.deepcopy(new_populations[index][j])
+                                    replaced_individual = self.ga_engines[i].population.individuals[random.randint(0, len(self.population.individuals) - 1)]
+                                    self.ga_engines[i].population.individuals[random.randint(0, len(self.population.individuals) - 1)] = migrating_individual
+                                    print(f"Migrating from GA{index+1} to GA{i+1}: Migrating individual fitness: {migrating_individual.fitness}, Replaced individual fitness: {replaced_individual.fitness}")
+                    # 이게 진짜.
+                    # for i in range(len(self.ga_engines)):
+                    #     target_index = migration_order[i]
+                    #     if target_index != i:
+                    #         if new_populations[i]:  # Source population should be from `i` not `target_index`
+                    #             elites_indices = sorted(range(len(self.ga_engines[target_index].population.individuals)), key=lambda idx: self.ga_engines[target_index].population.individuals[idx].fitness, reverse=True)[:len(new_populations[i])]
+                    #             for j in range(len(new_populations[i])):
+                    #                 migrating_individual = copy.deepcopy(new_populations[i][j])
+                    #                 replaced_individual = self.ga_engines[target_index].population.individuals[elites_indices[j]]
+                    #                 self.ga_engines[target_index].population.individuals[elites_indices[j]] = migrating_individual
+                    #                 print(f"Migrating from GA{i+1} to GA{target_index+1}: Migrating individual fitness: {migrating_individual.fitness}, Replaced individual fitness: {replaced_individual.fitness}")
+                    # for i in range(len(self.ga_engines)):
+                    #     target_index = migration_order[i]
+                    #     if target_index != i:
+                    #         if new_populations[i]:  # Source population은 `i`이고, 타겟 population은 `target_index`입니다.
+                    #             elites_indices = sorted(
+                    #                 range(len(self.ga_engines[i].population.individuals)),
+                    #                 key=lambda idx: self.ga_engines[i].population.individuals[idx].fitness,
+                    #                 reverse=True
+                    #             )[:len(new_populations[i])]
+                    #             for j in range(len(new_populations[i])):
+                    #                 migrating_individual = copy.deepcopy(new_populations[i][j])
+                    #                 replaced_individual = self.ga_engines[target_index].population.individuals[elites_indices[j]]
+                    #                 self.ga_engines[target_index].population.individuals[elites_indices[j]] = migrating_individual
+                    #                 print(f"Migrating from GA{i+1} to GA{target_index+1}: Migrating individual fitness: {migrating_individual.fitness}, Replaced individual fitness: {replaced_individual.fitness}")
+
+
+                    # for i in range(len(self.ga_engines)):
+                    #     target_index = migration_order[i]
+                    #     if target_index != i:
+                    #         if new_populations[target_index]:
+                    #             # GA1의 최적 개체들을 덮어씌우기 위해 GA1의 최적 개체들 인덱스를 선택
+                    #             elites_indices = sorted(range(len(self.ga_engines[i].population.individuals)), key=lambda idx: self.ga_engines[i].population.individuals[idx].fitness, reverse=True)[:len(new_populations[target_index])]
+                    #             for j in range(len(new_populations[target_index])):
+                    #                 migrating_individual = copy.deepcopy(new_populations[target_index][j])
+                    #                 replaced_individual = self.ga_engines[i].population.individuals[elites_indices[j]]
+                    #                 self.ga_engines[i].population.individuals[elites_indices[j]] = migrating_individual
+                    #                 print(f"Migrating from GA{target_index+1} to GA{i+1}: Migrating individual fitness: {migrating_individual.fitness}, Replaced individual fitness: {replaced_individual.fitness}")
+
+                    # 이게 진짜.
+                    # for i in range(len(self.ga_engines)):
+                    #     target_index = migration_order[i]
+                    #     if target_index != i:
+                    #         if new_populations[i]:  # Source population should be from `i` not `target_index`
+                    #             elites_indices = sorted(range(len(self.ga_engines[target_index].population.individuals)), key=lambda idx: self.ga_engines[target_index].population.individuals[idx].fitness, reverse=True)[:len(new_populations[i])]
+                    #             for j in range(len(new_populations[i])):
+                    #                 migrating_individual = copy.deepcopy(new_populations[i][j])
+                    #                 replaced_individual = self.ga_engines[target_index].population.individuals[elites_indices[j]]
+                    #                 self.ga_engines[target_index].population.individuals[elites_indices[j]] = migrating_individual
+                    #                 print(f"Migrating from GA{i+1} to GA{target_index+1}: Migrating individual fitness: {migrating_individual.fitness}, Replaced individual fitness: {replaced_individual.fitness}")
 
                     self.population.individuals = sorted(self.population.individuals, key=lambda ind: ind.fitness, reverse=True)
                     best_individual = min(self.population.individuals, key=lambda ind: ind.makespan)
@@ -177,7 +226,13 @@ class GAEngine:
                 with sync_lock:
                     sync_generation[index] += 1
 
-
+            # # OR-Tools 적용
+            # if self.ortools_optimizer:
+            #     print(f"GA{index+1}_Applying OR-Tools after all generations")
+            #     for i in range(len(self.population.individuals)):
+            #         individual = self.population.individuals[i]
+            #         optimized_individual = self.apply_ORtools(individual)
+            #         self.population.individuals[i] = optimized_individual
 
             if self.pso:
                 print(f"GA{index+1}_Applying PSO after all generations")
@@ -225,3 +280,10 @@ class GAEngine:
             for generation, individuals in all_generations:
                 for seq, makespan in individuals:
                     csvwriter.writerow([generation, seq, makespan])
+
+    # def apply_ORtools(self, individual):
+    #     best_individual = copy.deepcopy(individual)
+    #     optimized_individual = self.ortools_optimizer.optimize(best_individual, self.config)
+    #     if optimized_individual.makespan < best_individual.makespan:
+    #         best_individual = optimized_individual
+    #     return best_individual

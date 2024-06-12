@@ -2,7 +2,7 @@
 
 import simpy
 import numpy as np
-from environment.Part import Job
+from environment_multi.Part import Job
 
 
 # region Source

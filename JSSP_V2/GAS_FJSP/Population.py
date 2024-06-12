@@ -3,8 +3,8 @@
 import copy
 import numpy as np
 import random
-from GAS.Individual import Individual
-from Data.Dataset.Dataset import Dataset
+from GAS_FJSP.Individual import Individual
+from Data.Dataset.Dataset_multi import Dataset
 
 print_console = False
 
@@ -204,7 +204,7 @@ class Population:
         self.op_data = op_data
         if random_seed is not None:
             random.seed(random_seed)
-            np.random.seed(random_seed)        
+            np.random.seed(random_seed)
         self.individuals = [Individual(config, seq=random.sample(range(config.n_op), config.n_op), op_data=op_data) for _ in range(config.population_size)]
 
     @classmethod
@@ -215,7 +215,7 @@ class Population:
             random.seed(random_seed)
             np.random.seed(random_seed)
         individuals = [Individual(config, seq=jssp.get_seq(), op_data=dataset.op_data) for _ in range(config.population_size)]
-        population = cls(config, dataset.op_data)  # Create the Population instance with required arguments
+        population = cls(config, dataset.op_data)
         population.individuals = individuals
         return population
 
@@ -235,12 +235,24 @@ class Population:
         population.individuals = individuals
         return population
 
-    def evaluate(self, target_makespan):
+    def evaluate(self, target_makespan, multi_objective=True):
+        total_idle_time = 0
         for individual in self.individuals:
-            individual.makespan, individual.mio_score = individual.evaluate(individual.machine_order)
-            individual.calculate_fitness(target_makespan)
-        # 스케일링 방법 선택 (Rank Scaling, Sigma Scaling, Boltzmann Scaling)
-        scaling_method = 'min-max'  # 'min-max', 'sigma', 'boltzmann' 등을 사용할 수 있습니다.
+            individual_makespan, individual_mio_score, individual_idle_time, individual_real_time = individual.evaluate(individual.machine_order)
+            individual.makespan = individual_makespan
+            individual.idle_time = individual_idle_time
+            individual.real_time = individual_real_time
+            idle_time = individual_idle_time if multi_objective else None
+            if idle_time is not None:
+                total_idle_time += idle_time
+            individual.calculate_fitness(target_makespan, idle_time, multi_objective)
+
+        if multi_objective:
+            print(f"Total idle time for this generation: {total_idle_time}")
+            for individual in self.individuals:
+                print(f"Individual idle time: {individual.idle_time}")
+
+        scaling_method = 'min-max'
 
         if scaling_method == 'min-max':
             self.min_max_scaling()
@@ -262,6 +274,13 @@ class Population:
         else:
             for individual in self.individuals:
                 individual.scaled_fitness = 1.0  # In case all fitness values are the same
+
+    def calculate_idle_time(self, individual):
+        total_idle_time = 0
+        for machine in individual.machine_order:
+            machine_idle_time = machine.calculate_idle_time(individual.makespan)
+            total_idle_time += machine_idle_time
+        return total_idle_time
 
     def rank_scaling(self):
         sorted_individuals = sorted(self.individuals, key=lambda ind: ind.fitness, reverse=True)
