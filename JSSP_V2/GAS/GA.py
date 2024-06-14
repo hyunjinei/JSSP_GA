@@ -52,7 +52,7 @@ class GAEngine:
         self.local_search_frequency = local_search_frequency
         self.selective_mutation_frequency = selective_mutation_frequency
         self.random_seed = random_seed
-        self.local_search_top_percentage = 0.05  
+        self.local_search_top_percentage = 0.1  
         # self.new_populations = [[] for _ in range(len(ga_engines))]
         # self.ortools_optimizer = ortools_optimizer
 
@@ -95,9 +95,9 @@ class GAEngine:
                     random_index = random.randint(0, len(self.population.individuals) - 1)
                     self.population.individuals[random_index] = elite
 
-                if sync_generation[index] > 0 and self.selective_mutation and sync_generation[index] % self.selective_mutation_frequency == 0:
-                    print(f'GA{index+1}_Selective Mutation 전반부 적용')
-                    self.selective_mutation.mutate(self.population.individuals, self.config)
+                # if sync_generation[index] > 0 and self.selective_mutation and sync_generation[index] % self.selective_mutation_frequency == 0:
+                #     print(f'GA{index+1}_Selective Mutation 전반부 적용')
+                #     self.selective_mutation.mutate(self.population.individuals, self.config)
 
                 if sync_generation[index] > 0 and sync_generation[index] % self.local_search_frequency == 0:
                     print(f"GA{index+1}_Applying local search")
@@ -205,6 +205,11 @@ class GAEngine:
                     best_individual = min(self.population.individuals, key=lambda ind: ind.makespan)
                     best_fitness = best_individual.makespan
                     print(f"GA{index+1}_Best individual after migration: Fitness: {best_fitness}, Sequence: {best_individual.seq}")
+
+                if sync_generation[index] > 0 and self.selective_mutation and sync_generation[index] % self.selective_mutation_frequency == 0:
+                    print(f'GA{index+1}_Selective Mutation 전반부 적용')
+                    self.selective_mutation.mutate(self.population.individuals, self.config)
+
 
                 print(f"GA{index+1}_Generation {sync_generation[index]} evaluated")
                 current_best = min(self.population.individuals, key=lambda ind: ind.makespan)

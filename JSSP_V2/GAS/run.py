@@ -29,13 +29,13 @@ from GAS.Mutation.ReciprocalExchangeMutation import ReciprocalExchangeMutation
 from GAS.Mutation.ShiftMutation import ShiftMutation
 from GAS.Mutation.InversionMutation import InversionMutation
 from GAS.Mutation.SwapMutation import SwapMutation
-from GAS.Mutation.DiverseSwapMutation import DiverseSwapMutation
+# from GAS.Mutation.IntelligentMutation import IntelligentMutation
 
 # Selection
 from GAS.Selection.RouletteSelection import RouletteSelection
 from GAS.Selection.SeedSelection import SeedSelection
 from GAS.Selection.TournamentSelection import TournamentSelection
-from GAS.Selection.TruncationSelection import TruncationSelection
+# from GAS.Selection.TruncationSelection import TruncationSelection
 
 # Local Search
 from Local_Search.HillClimbing import HillClimbing
@@ -80,8 +80,8 @@ abz5 = 1234  10, 10
 ft20 = 1165
 '''
 
-TARGET_MAKESPAN = 597  # 목표 Makespan
-MIGRATION_FREQUENCY = 200  # Migration frequency 설정
+TARGET_MAKESPAN = 1642  # 목표 Makespan
+MIGRATION_FREQUENCY = 300  # Migration frequency 설정
 random_seed = 42  # Population 초기화시 일정하게 만들기 위함. None을 넣으면 아예 랜덤 생성(GA들끼리 같지않음)
 
 
@@ -137,11 +137,11 @@ def main():
     island_mode = int(input("Select Island-Parallel GA mode (1: Independent, 2: Sequential Migration, 3: Random Migration): "))
     print(f"Selected Island-Parallel GA mode: {island_mode}")
 
-    file = 'la03.txt'
+    file = 'ta21.txt'
     print(f"Loading dataset from {file}...")  # 디버그 출력 추가
     dataset = Dataset(file)
 
-    base_config = Run_Config(n_job=10, n_machine=5, n_op=50, population_size=300, generations=200, 
+    base_config = Run_Config(n_job=20, n_machine=20, n_op=400, population_size=500, generations=100, 
                              print_console=False, save_log=True, save_machinelog=True, 
                              show_gantt=False, save_gantt=True, show_gui=False,
                              trace_object='Process4', title='Gantt Chart for JSSP',
@@ -198,15 +198,19 @@ def main():
     '''
 
     custom_settings = [
-        {'crossover': POXCrossover, 'pc': 0.7, 'mutation': DiverseSwapMutation, 'pm': 0.05, 'selection': TruncationSelection(),'elite_TS': 0.2, 'local_search': [], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
+        # {'crossover': POXCrossover, 'pc': 0.7, 'mutation': IntelligentMutation, 'pm': 0.05, 'selection': TruncationSelection(),'elite_TS': 0.2, 'local_search': [], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
+        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.7, pm_low=0.4, rank_divide=0.05)},
+        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.8, pm_low=0.1, rank_divide=0.05)},
     ]
+
+# (pm_high=0.5, pm_low=0.01, rank_divide=0.4) 기존
 
     ga_engines = []
     for i, setting in enumerate(custom_settings):
         crossover_class = setting['crossover']
         mutation_class = setting['mutation']
         selection_instance = setting['selection']
-        selection_instance.elite_TS = setting['elite_TS']  # 여기에 설정합니다.
+        # selection_instance.elite_TS = setting['elite_TS']  # 여기에 설정합니다.
         local_search_methods = setting['local_search']
         pso_class = setting.get('pso')
         selective_mutation_instance = setting['selective_mutation']
@@ -229,16 +233,16 @@ def main():
         selection = selection_instance
         pso = pso_class if pso_class else None
         local_search = local_search_methods
-        local_search_frequency = 200
-        selective_mutation_frequency = 2
+        local_search_frequency = 40
+        selective_mutation_frequency = 20
         selective_mutation = selective_mutation_instance
 
         if initialization_mode == '1':
-            ga_engine = GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso, selective_mutation, elite_ratio=0, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, local_search_frequency=local_search_frequency, selective_mutation_frequency=selective_mutation_frequency, random_seed=random_seed)
+            ga_engine = GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso, selective_mutation, elite_ratio=0.05, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, local_search_frequency=local_search_frequency, selective_mutation_frequency=selective_mutation_frequency, random_seed=random_seed)
         elif initialization_mode == '2':
-            ga_engine = GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso, selective_mutation, elite_ratio=0, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, initialization_mode='2', dataset_filename=config.dataset_filename, local_search_frequency=local_search_frequency, selective_mutation_frequency=selective_mutation_frequency, random_seed=random_seed)
+            ga_engine = GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso, selective_mutation, elite_ratio=0.05, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, initialization_mode='2', dataset_filename=config.dataset_filename, local_search_frequency=local_search_frequency, selective_mutation_frequency=selective_mutation_frequency, random_seed=random_seed)
         elif initialization_mode == '3':
-            ga_engine = GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso, selective_mutation, elite_ratio=0, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, initialization_mode='3', dataset_filename=config.dataset_filename, local_search_frequency=local_search_frequency, selective_mutation_frequency=selective_mutation_frequency, random_seed=random_seed)
+            ga_engine = GAEngine(config, dataset.op_data, crossover, mutation, selection, local_search, pso, selective_mutation, elite_ratio=0.05, ga_engines=ga_engines, island_mode=island_mode, migration_frequency=MIGRATION_FREQUENCY, initialization_mode='3', dataset_filename=config.dataset_filename, local_search_frequency=local_search_frequency, selective_mutation_frequency=selective_mutation_frequency, random_seed=random_seed)
         
         ga_engines.append(ga_engine)
 

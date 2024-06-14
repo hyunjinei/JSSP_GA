@@ -13,7 +13,7 @@ class TruncationSelection:
     def select(self, population):
         # 상위 elite_TS% 개체를 선택
         elite_count = max(1, int(len(population) * self.elite_TS))
-        elite_individuals = sorted(population, key=lambda ind: ind.fitness, reverse=True)[:elite_count]
+        elite_individuals = sorted(population, key=lambda ind: ind.fitness)[:elite_count]
 
         # 나머지 개체는 무작위로 선택
         remaining_individuals = [ind for ind in population if ind not in elite_individuals]
@@ -24,5 +24,4 @@ class TruncationSelection:
             winner = max(tournament, key=lambda ind: ind.fitness)
             selected_individuals.append(winner)
 
-        # 무작위로 하나의 개체 선택하여 반환
-        return random.choice(selected_individuals)
+        return selected_individuals
