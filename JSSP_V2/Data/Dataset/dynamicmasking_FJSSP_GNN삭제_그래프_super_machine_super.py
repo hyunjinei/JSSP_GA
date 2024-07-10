@@ -39,15 +39,15 @@ class DQN(nn.Module):
 
 
 class DDQNAgent:
-    def __init__(self, input_dim, action_size, update_target_frequency=10, replay_start_size=100, batch_size=80):
+    def __init__(self, input_dim, action_size, update_target_frequency=80, replay_start_size=100, batch_size=80):
         self.input_dim = input_dim
         self.action_size = action_size
         self.memory = deque(maxlen=20000000)
-        self.gamma = 0.99
+        self.gamma = 0.5
         self.epsilon = 0.99
         self.epsilon_min = 0.001
-        self.epsilon_decay = 0.995
-        self.learning_rate = 0.00005
+        self.epsilon_decay = 0.99
+        self.learning_rate = 0.00001
         self.model = DQN(input_dim, action_size)
         self.target_model = DQN(input_dim, action_size)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
@@ -59,10 +59,10 @@ class DDQNAgent:
         self.episode_count = 0
 
     def remember(self, state, action, reward, next_state, done):
-        # print(f"Action before processing: {action}")
         if isinstance(action, dict):
             action = next(iter(action.values()))
-        # print(f"Action after processing: {action}")
+        elif isinstance(action, (list, tuple)):
+            action = action[0]
         self.memory.append((state, action, reward, next_state, done))
 
     def act(self, state, valid_operations):
@@ -70,11 +70,16 @@ class DDQNAgent:
             return random.choice(valid_operations)
         
         state = torch.FloatTensor(state).unsqueeze(0)
-        act_values = self.model(state).squeeze(0)  # 차원 축소
         
-        # 유효한 operation들에 대해서만 Q-value를 고려
-        valid_q_values = {op: act_values[i].item() for i, op in enumerate(valid_operations)}
-        return max(valid_q_values, key=valid_q_values.get)
+        q_values = self.model(state).squeeze(0)
+        valid_q_indices = [i for i, op in enumerate(valid_operations) if i < self.action_size]
+        best_action_index = max(valid_q_indices, key=lambda i: q_values[i].item())
+        
+        target_q_values = self.target_model(state).squeeze(0)
+        best_action_value = target_q_values[best_action_index].item()
+        
+        return valid_operations[best_action_index]
+
 
     def update_epsilon(self, global_episode_count):
         if self.epsilon > self.epsilon_min:
@@ -89,16 +94,22 @@ class DDQNAgent:
         states, actions, rewards, next_states, done = zip(*minibatch)
 
         states = torch.FloatTensor(np.array(states))
-        # actions 처리를 수정
-        actions = [action if isinstance(action, (int, np.integer)) else 
-                (next(iter(action.values())) if isinstance(action, dict) else action) 
-                for action in actions]
+        # print("Raw actions:", actions)
+        actions = [min(max(action, 0), self.action_size - 1) if isinstance(action, (int, np.integer)) 
+                   else min(max(next(iter(action.values())) if isinstance(action, dict) else action, 0), self.action_size - 1) 
+                   for action in actions]
+        # print("Processed actions:", actions)
         actions = torch.LongTensor(actions)
+        # print("Action tensor:", actions)
+        # print("Action tensor max:", actions.max())
+        # print("Action tensor min:", actions.min())
         rewards = torch.FloatTensor(rewards)
         next_states = torch.FloatTensor(np.array(next_states))
         done = torch.FloatTensor(done)
 
         q_values = self.model(states)
+        # print("Q-values shape:", q_values.shape)
+        
         next_q_values = self.model(next_states)
         next_q_actions = torch.argmax(next_q_values, dim=1)
         target_next_q_values = self.target_model(next_states)
@@ -219,7 +230,7 @@ class MultiAgentGraph:
         return features
 
 class SupervisorAgent(DDQNAgent):
-    def __init__(self, input_dim, action_size, update_target_frequency=10, replay_start_size=100, batch_size=80):
+    def __init__(self, input_dim, action_size, update_target_frequency=80, replay_start_size=100, batch_size=80):
         super().__init__(input_dim, action_size, update_target_frequency, replay_start_size, batch_size)
         self.used_machines = set()
 
@@ -239,15 +250,22 @@ class SupervisorAgent(DDQNAgent):
         self.memory.append((state, action, reward, next_state, done))
 
     def select_machine(self, available_machines, state_features):
-        # available_machines 중에서 하나를 선택
         if np.random.rand() <= self.epsilon:
             return random.choice(available_machines)
         
         machine_values = []
         for machine in available_machines:
-            machine_state = state_features[f'M_{machine}']
-            q_values = self.model(torch.FloatTensor(machine_state).unsqueeze(0))
-            machine_values.append(q_values.max().item())
+            machine_state = torch.FloatTensor(state_features[f'M_{machine}']).unsqueeze(0)
+            
+            # 현재 네트워크로 행동(machine) 선택
+            q_values = self.model(machine_state)
+            best_action = q_values.argmax(dim=1)
+            
+            # 타겟 네트워크로 선택된 행동의 가치 평가
+            target_q_values = self.target_model(machine_state)
+            machine_value = target_q_values[0, best_action].item()
+            
+            machine_values.append(machine_value)
         
         return available_machines[np.argmax(machine_values)]
 
@@ -427,7 +445,18 @@ def train_individual_models(datasets, num_episodes_per_dataset):
                     state_features[agent_id] = combined_features
 
                 # SupervisorAgent의 상태 추가
-                supervisor_graph_features = multi_agent_system.graph.get_state_features(list(multi_agent_system.agents.keys())[0])
+                # 각 machine agent의 Q-value를 계산하여 가장 높은 Q-value를 가진 machine agent 선택
+                machine_q_values = []
+                for machine_id in multi_agent_system.machines:
+                    machine_agent_id = f'M_{machine_id}'
+                    q_value = multi_agent_system.agents[machine_agent_id].model(
+                        torch.FloatTensor(state_features[machine_agent_id]).unsqueeze(0)
+                    ).max().item()
+                    machine_q_values.append((q_value, machine_agent_id))
+                
+                best_machine_agent_id = max(machine_q_values, key=lambda x: x[0])[1]
+                supervisor_graph_features = multi_agent_system.graph.get_state_features(best_machine_agent_id)
+                
                 supervisor_state_features = np.concatenate((
                     supervisor_graph_features,
                     np.array([state['current_time']]),
@@ -524,6 +553,8 @@ def train_individual_models(datasets, num_episodes_per_dataset):
 
                 if done:
                     reward_task, reward_machine = env.calculate_episode_rewards()
+                    reward_task += episode_reward
+                    reward_machine += episode_reward
                     print(f"Training: Episode {episode+1} processed. Reward Task: {reward_task}, Reward Machine: {reward_machine}, episode reward every step: {episode_reward}")
                     break
 
@@ -541,8 +572,7 @@ def train_individual_models(datasets, num_episodes_per_dataset):
 
     return multi_agent_system, None, data.n_machine
 
-
-def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=100000000, epsilon=0.1):
+def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=100000000, epsilon=0.001):
     valid_solution_count = 0
     all_predictions = []
     step_count = 0
@@ -581,7 +611,18 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
                 state_features[agent_id] = combined_features
 
             # SupervisorAgent의 상태 추가
-            supervisor_graph_features = multi_agent_system.graph.get_state_features(list(multi_agent_system.agents.keys())[0])
+            # 각 machine agent의 Q-value를 계산하여 가장 높은 Q-value를 가진 machine agent 선택
+            machine_q_values = []
+            for machine_id in multi_agent_system.machines:
+                machine_agent_id = f'M_{machine_id}'
+                q_value = multi_agent_system.agents[machine_agent_id].model(
+                    torch.FloatTensor(state_features[machine_agent_id]).unsqueeze(0)
+                ).max().item()
+                machine_q_values.append((q_value, machine_agent_id))
+            
+            best_machine_agent_id = max(machine_q_values, key=lambda x: x[0])[1]
+            supervisor_graph_features = multi_agent_system.graph.get_state_features(best_machine_agent_id)
+            
             supervisor_state_features = np.concatenate((
                 supervisor_graph_features,
                 np.array([state['current_time']]),
@@ -682,6 +723,8 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
 
         if done:
             reward_task, reward_machine = env.calculate_episode_rewards()
+            reward_task += episode_reward
+            reward_machine += episode_reward
             multi_agent_system.end_episode(state_features, reward_task, reward_machine, done)
             print(f"Prediction: Episode {valid_solution_count+1}/{num_predictions} processed. "
                   f"Reward Task: {reward_task}, Reward Machine: {reward_machine}, Episode every step Reward: {episode_reward}")
@@ -693,6 +736,10 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
         print(f"Warning: Only {valid_solution_count} valid solutions were collected.")
 
     return all_predictions
+
+
+
+
 def main():
     datasets = [
         'fjsspdataset/HurinkRdata7.fjs',

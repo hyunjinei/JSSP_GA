@@ -39,15 +39,15 @@ class DQN(nn.Module):
 
 
 class DDQNAgent:
-    def __init__(self, input_dim, action_size, update_target_frequency=10, replay_start_size=100, batch_size=80):
+    def __init__(self, input_dim, action_size, update_target_frequency=80, replay_start_size=100, batch_size=80):
         self.input_dim = input_dim
         self.action_size = action_size
         self.memory = deque(maxlen=20000000)
-        self.gamma = 0.99
+        self.gamma = 0.5
         self.epsilon = 0.99
         self.epsilon_min = 0.001
-        self.epsilon_decay = 0.995
-        self.learning_rate = 0.00005
+        self.epsilon_decay = 0.99
+        self.learning_rate = 0.00001
         self.model = DQN(input_dim, action_size)
         self.target_model = DQN(input_dim, action_size)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
@@ -59,18 +59,27 @@ class DDQNAgent:
         self.episode_count = 0
 
     def remember(self, state, action, reward, next_state, done):
-        # print(f"Action before processing: {action}")
         if isinstance(action, dict):
             action = next(iter(action.values()))
-        # print(f"Action after processing: {action}")
+        elif isinstance(action, (list, tuple)):
+            action = action[0]
         self.memory.append((state, action, reward, next_state, done))
 
-    def act(self, state):
+    def act(self, state, valid_operations):
         if np.random.rand() <= self.epsilon:
-            return random.randrange(self.action_size)
+            return random.choice(valid_operations)
+        
         state = torch.FloatTensor(state).unsqueeze(0)
-        act_values = self.model(state)
-        return torch.argmax(act_values).item()
+        
+        q_values = self.model(state).squeeze(0)
+        valid_q_indices = [i for i, op in enumerate(valid_operations) if i < self.action_size]
+        best_action_index = max(valid_q_indices, key=lambda i: q_values[i].item())
+        
+        target_q_values = self.target_model(state).squeeze(0)
+        best_action_value = target_q_values[best_action_index].item()
+        
+        return valid_operations[best_action_index]
+
 
     def update_epsilon(self, global_episode_count):
         if self.epsilon > self.epsilon_min:
@@ -85,14 +94,22 @@ class DDQNAgent:
         states, actions, rewards, next_states, done = zip(*minibatch)
 
         states = torch.FloatTensor(np.array(states))
-        # actions 처리를 수정
-        actions = [action if isinstance(action, (int, np.integer)) else next(iter(action.values())) for action in actions]
+        # print("Raw actions:", actions)
+        actions = [min(max(action, 0), self.action_size - 1) if isinstance(action, (int, np.integer)) 
+                   else min(max(next(iter(action.values())) if isinstance(action, dict) else action, 0), self.action_size - 1) 
+                   for action in actions]
+        # print("Processed actions:", actions)
         actions = torch.LongTensor(actions)
+        # print("Action tensor:", actions)
+        # print("Action tensor max:", actions.max())
+        # print("Action tensor min:", actions.min())
         rewards = torch.FloatTensor(rewards)
         next_states = torch.FloatTensor(np.array(next_states))
         done = torch.FloatTensor(done)
 
         q_values = self.model(states)
+        # print("Q-values shape:", q_values.shape)
+        
         next_q_values = self.model(next_states)
         next_q_actions = torch.argmax(next_q_values, dim=1)
         target_next_q_values = self.target_model(next_states)
@@ -213,7 +230,7 @@ class MultiAgentGraph:
         return features
 
 class SupervisorAgent(DDQNAgent):
-    def __init__(self, input_dim, action_size, update_target_frequency=10, replay_start_size=100, batch_size=80):
+    def __init__(self, input_dim, action_size, update_target_frequency=80, replay_start_size=100, batch_size=80):
         super().__init__(input_dim, action_size, update_target_frequency, replay_start_size, batch_size)
         self.used_machines = set()
 
@@ -231,6 +248,26 @@ class SupervisorAgent(DDQNAgent):
         if isinstance(action, (list, tuple)):
             action = action[0]
         self.memory.append((state, action, reward, next_state, done))
+
+    def select_machine(self, available_machines, state_features):
+        if np.random.rand() <= self.epsilon:
+            return random.choice(available_machines)
+        
+        machine_values = []
+        for machine in available_machines:
+            machine_state = torch.FloatTensor(state_features[f'M_{machine}']).unsqueeze(0)
+            
+            # 현재 네트워크로 행동(machine) 선택
+            q_values = self.model(machine_state)
+            best_action = q_values.argmax(dim=1)
+            
+            # 타겟 네트워크로 선택된 행동의 가치 평가
+            target_q_values = self.target_model(machine_state)
+            machine_value = target_q_values[0, best_action].item()
+            
+            machine_values.append(machine_value)
+        
+        return available_machines[np.argmax(machine_values)]
 
     def replay(self):
         if len(self.memory) < self.replay_start_size:
@@ -284,22 +321,23 @@ class MultiAgentSystem:
         self.actual_actions = {}  # 실제 액션을 저장하기 위한 딕셔너리
 
     def initialize_agents(self, sample_state):
+        print(f"Sample state: {sample_state}")  # Sample state 출력
         input_dim = self.calculate_input_dim(sample_state)
+        print(f"Calculated input dimension: {input_dim}")  # Calculated input dimension 출력
         self.agents = {f'M_{machine}': DDQNAgent(input_dim, self.action_size) for machine in self.machines}
         self.agents.update({f'J_{job}': DDQNAgent(input_dim, self.action_size) for job in self.jobs})
         self.supervisor = SupervisorAgent(input_dim, self.action_size)  # SupervisorAgent 초기화
         self.replay_start_size = 100
         self.global_episode_count = 0
 
-    def reset(self):
-        for agent in self.agents.values():
-            agent.epsilon = 0.99  # 에이전트의 탐험률 초기화 (필요에 따라 조정)
-        self.supervisor.reset()  # SupervisorAgent 초기화
-
     def calculate_input_dim(self, state):
-        graph_features_length = len(self.graph.get_state_features(f'M_{self.machines[0]}'))
+        # 모든 머신 에이전트에 대한 그래프 특징 길이 계산
+        machine_graph_features_length = sum(
+            len(self.graph.get_state_features(f'M_{i}')) for i in range(len(self.machines))
+        )
+        # 환경 상태 길이 계산
         env_state_length = (
-            1 +
+            1 +  # current_time
             len(state['job_completion']) +
             len(state['machine_available_time']) +
             len(state['machine_utilization']) +
@@ -309,7 +347,13 @@ class MultiAgentSystem:
             sum(len(status) for status in state['job_op_status']) +
             len(state['machine_status'])
         )
-        return graph_features_length + env_state_length
+        return machine_graph_features_length + env_state_length
+
+
+    def reset(self):
+        for agent in self.agents.values():
+            agent.epsilon = 0.99  # 에이전트의 탐험률 초기화 (필요에 따라 조정)
+        self.supervisor.reset()  # SupervisorAgent 초기화
 
     def act(self, state, mask):
         actions = {}
@@ -319,8 +363,9 @@ class MultiAgentSystem:
         return actions
 
     def remember(self, agent_id, state, action, reward, next_state, done):
-        self.agents[agent_id].remember(state, {agent_id: action}, reward, next_state, done)
-        self.actual_actions[agent_id] = action  # 실제 액션을 저장
+        if isinstance(action, dict):
+            action = next(iter(action.values()))
+        self.agents[agent_id].remember(state, action, reward, next_state, done)
 
     def replay(self):
         for agent_id, agent in self.agents.items():
@@ -375,7 +420,6 @@ def train_individual_models(datasets, num_episodes_per_dataset):
         env = JobShopEnv_FJSSP(process_times, machine_sequence, solutions=None)
         initial_state = env.reset()
 
-        # `initialize_agents` 메서드를 통해 `MultiAgentSystem`과 `SupervisorAgent` 초기화
         multi_agent_system = MultiAgentSystem(machines=range(data.n_machine), jobs=range(data.n_job), state_size=None, action_size=action_size)
         multi_agent_system.initialize_agents(initial_state)
 
@@ -390,10 +434,15 @@ def train_individual_models(datasets, num_episodes_per_dataset):
                 state = env.get_state()
                 multi_agent_system.graph.update_graph(state)
                 state_features = {}
+
+                # 모든 에이전트의 그래프 특징을 포함
+                machine_graph_features = np.concatenate(
+                    [multi_agent_system.graph.get_state_features(f'M_{i}') for i in range(len(multi_agent_system.machines))]
+                )
+
                 for agent_id in multi_agent_system.agents:
-                    graph_features = multi_agent_system.graph.get_state_features(agent_id)
                     combined_features = np.concatenate((
-                        graph_features,
+                        machine_graph_features,
                         np.array([state['current_time']]),
                         state['job_completion'],
                         state['machine_available_time'],
@@ -405,11 +454,13 @@ def train_individual_models(datasets, num_episodes_per_dataset):
                         np.array(state['machine_status'], dtype=int)
                     ))
                     state_features[agent_id] = combined_features
+                    if episode == 0 and step_count == 0:
+                        print(f"Episode {episode}, Step {step_count}, Agent {agent_id}, State features length: {len(combined_features)}")
+                        print(f"State features: {combined_features}")
 
-                # SupervisorAgent의 상태 추가
-                supervisor_graph_features = multi_agent_system.graph.get_state_features(list(multi_agent_system.agents.keys())[0])
-                supervisor_state_features = np.concatenate((
-                    supervisor_graph_features,
+                # SupervisorAgent의 상태 추가 및 출력
+                supervisor_combined_features = np.concatenate((
+                    machine_graph_features,
                     np.array([state['current_time']]),
                     state['job_completion'],
                     state['machine_available_time'],
@@ -420,7 +471,11 @@ def train_individual_models(datasets, num_episodes_per_dataset):
                     np.array([status for job_status in state['job_op_status'] for status in job_status]),
                     np.array(state['machine_status'], dtype=int)
                 ))
-                state_features['supervisor'] = supervisor_state_features
+                state_features['supervisor'] = supervisor_combined_features
+
+                if episode == 0 and step_count == 0:
+                    print(f"Episode {episode}, Step {step_count}, Supervisor Agent, State features length: {len(supervisor_combined_features)}")
+                    print(f"State features: {supervisor_combined_features}")
 
                 valid_actions = env.get_valid_actions()
                 machine_actions = {}
@@ -430,14 +485,23 @@ def train_individual_models(datasets, num_episodes_per_dataset):
                     multi_agent_system.supervisor.reset()
                     available_machines = [m for job, op, m in valid_actions]
 
-                for agent_id in multi_agent_system.agents:
-                    if agent_id.startswith('M_'):
-                        machine_id = int(agent_id.split('_')[1])
-                        if machine_id in available_machines:
-                            for job, op, machine in valid_actions:
-                                if machine == machine_id:
-                                    action = multi_agent_system.agents[agent_id].act(state_features[agent_id])
-                                    machine_actions[(job, op, machine)] = action
+                selected_machine = multi_agent_system.supervisor.select_machine(available_machines, state_features)
+                selected_machine_agent_id = f'M_{selected_machine}'
+                valid_operations = []
+                for job, op, machine in valid_actions:
+                    if machine == selected_machine:
+                        valid_operations.append((job, op))
+
+                if valid_operations:
+                    selected_operation = multi_agent_system.agents[selected_machine_agent_id].act(
+                        state_features[selected_machine_agent_id], 
+                        valid_operations
+                    )
+                    selected_job, selected_op = selected_operation
+                    action = (selected_job, selected_op, selected_machine)
+                    machine_actions[action] = multi_agent_system.agents[selected_machine_agent_id].model(
+                        torch.FloatTensor(state_features[selected_machine_agent_id]).unsqueeze(0)
+                    ).squeeze(0)[valid_operations.index(selected_operation)].item()
 
                 if not machine_actions:
                     continue
@@ -445,15 +509,14 @@ def train_individual_models(datasets, num_episodes_per_dataset):
                 best_action = max(machine_actions, key=machine_actions.get)
                 selected_job, selected_op, selected_machine = best_action
                 multi_agent_system.supervisor.update(selected_machine)
-                selected_machine_agent_id = f'M_{selected_machine}'
 
                 next_state, done, step_reward = env.step(selected_job, selected_op, selected_machine)
                 multi_agent_system.graph.update_graph(next_state)
                 next_state_features = {}
+
                 for agent_id in multi_agent_system.agents:
-                    graph_features = multi_agent_system.graph.get_state_features(agent_id)
                     combined_features = np.concatenate((
-                        graph_features,
+                        machine_graph_features,
                         np.array([next_state['current_time']]),
                         next_state['job_completion'],
                         next_state['machine_available_time'],
@@ -466,23 +529,10 @@ def train_individual_models(datasets, num_episodes_per_dataset):
                     ))
                     next_state_features[agent_id] = combined_features
 
-                # SupervisorAgent의 상태 추가
-                next_supervisor_state_features = np.concatenate((
-                    supervisor_graph_features,
-                    np.array([next_state['current_time']]),
-                    next_state['job_completion'],
-                    next_state['machine_available_time'],
-                    next_state['machine_utilization'],
-                    next_state['job_queue_length'],
-                    next_state['job_progress'],
-                    next_state['remaining_job_time'],
-                    np.array([status for job_status in next_state['job_op_status'] for status in job_status]),
-                    np.array(next_state['machine_status'], dtype=int)
-                ))
-                next_state_features['supervisor'] = next_supervisor_state_features
+                next_state_features['supervisor'] = combined_features
 
-                multi_agent_system.remember(selected_machine_agent_id, state_features[selected_machine_agent_id], {selected_machine_agent_id: machine_actions[best_action]}, step_reward, next_state_features[selected_machine_agent_id], done)
-                multi_agent_system.supervisor.remember(supervisor_state_features, best_action, step_reward, next_supervisor_state_features, done)  # Supervisor도 기억
+                multi_agent_system.remember(selected_machine_agent_id, state_features[selected_machine_agent_id], machine_actions[action], step_reward, next_state_features[selected_machine_agent_id], done)
+                multi_agent_system.supervisor.remember(state_features['supervisor'], best_action, step_reward, next_state_features['supervisor'], done)
 
                 state = next_state
                 episode_reward += step_reward
@@ -493,6 +543,8 @@ def train_individual_models(datasets, num_episodes_per_dataset):
 
                 if done:
                     reward_task, reward_machine = env.calculate_episode_rewards()
+                    reward_task += episode_reward
+                    reward_machine += episode_reward
                     print(f"Training: Episode {episode+1} processed. Reward Task: {reward_task}, Reward Machine: {reward_machine}, episode reward every step: {episode_reward}")
                     break
 
@@ -511,7 +563,7 @@ def train_individual_models(datasets, num_episodes_per_dataset):
     return multi_agent_system, None, data.n_machine
 
 
-def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=100000000, epsilon=0.1):
+def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=100000000, epsilon=0.000001):
     valid_solution_count = 0
     all_predictions = []
     step_count = 0
@@ -533,8 +585,13 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
             state = env.get_state()
             multi_agent_system.graph.update_graph(state)
             state_features = {}
+
             for agent_id in multi_agent_system.agents:
-                graph_features = multi_agent_system.graph.get_state_features(agent_id)
+                # 모든 machine agent들의 graph features를 포함
+                graph_features = np.concatenate([
+                    multi_agent_system.graph.get_state_features(f'M_{i}')
+                    for i in range(len(multi_agent_system.machines))
+                ])
                 combined_features = np.concatenate((
                     graph_features,
                     np.array([state['current_time']]),
@@ -550,7 +607,10 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
                 state_features[agent_id] = combined_features
 
             # SupervisorAgent의 상태 추가
-            supervisor_graph_features = multi_agent_system.graph.get_state_features(list(multi_agent_system.agents.keys())[0])
+            supervisor_graph_features = np.concatenate([
+                multi_agent_system.graph.get_state_features(f'M_{i}')
+                for i in range(len(multi_agent_system.machines))
+            ])
             supervisor_state_features = np.concatenate((
                 supervisor_graph_features,
                 np.array([state['current_time']]),
@@ -573,14 +633,26 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
                 multi_agent_system.supervisor.reset()
                 available_machines = [m for job, op, m in valid_actions]
 
-            for agent_id in multi_agent_system.agents:
-                if agent_id.startswith('M_'):
-                    machine_id = int(agent_id.split('_')[1])
-                    if machine_id in available_machines:
-                        for job, op, machine in valid_actions:
-                            if machine == machine_id:
-                                action = multi_agent_system.agents[agent_id].act(state_features[agent_id])
-                                machine_actions[(job, op, machine)] = action
+            # SupervisorAgent가 machine 선택
+            selected_machine = multi_agent_system.supervisor.select_machine(available_machines, state_features)
+            
+            # 선택된 machine에 대해서만 action 결정
+            selected_machine_agent_id = f'M_{selected_machine}'
+            valid_operations = []
+            for job, op, machine in valid_actions:
+                if machine == selected_machine:
+                    valid_operations.append((job, op))
+
+            if valid_operations:
+                selected_operation = multi_agent_system.agents[selected_machine_agent_id].act(
+                    state_features[selected_machine_agent_id], 
+                    valid_operations
+                )
+                selected_job, selected_op = selected_operation
+                action = (selected_job, selected_op, selected_machine)
+                machine_actions[action] = multi_agent_system.agents[selected_machine_agent_id].model(
+                    torch.FloatTensor(state_features[selected_machine_agent_id]).unsqueeze(0)
+                ).squeeze(0)[valid_operations.index(selected_operation)].item()
 
             if not machine_actions:
                 continue
@@ -588,13 +660,15 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
             best_action = max(machine_actions, key=machine_actions.get)
             selected_job, selected_op, selected_machine = best_action
             multi_agent_system.supervisor.update(selected_machine)
-            selected_machine_agent_id = f'M_{selected_machine}'
 
             next_state, done, step_reward = env.step(selected_job, selected_op, selected_machine)
             multi_agent_system.graph.update_graph(next_state)
             next_state_features = {}
             for agent_id in multi_agent_system.agents:
-                graph_features = multi_agent_system.graph.get_state_features(agent_id)
+                graph_features = np.concatenate([
+                    multi_agent_system.graph.get_state_features(f'M_{i}')
+                    for i in range(len(multi_agent_system.machines))
+                ])
                 combined_features = np.concatenate((
                     graph_features,
                     np.array([next_state['current_time']]),
@@ -624,7 +698,7 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
             ))
             next_state_features['supervisor'] = next_supervisor_state_features
 
-            multi_agent_system.remember(selected_machine_agent_id, state_features[selected_machine_agent_id], {selected_machine_agent_id: machine_actions[best_action]}, step_reward, next_state_features[selected_machine_agent_id], done)
+            multi_agent_system.remember(selected_machine_agent_id, state_features[selected_machine_agent_id], machine_actions[action], step_reward, next_state_features[selected_machine_agent_id], done)
             multi_agent_system.supervisor.remember(supervisor_state_features, best_action, step_reward, next_supervisor_state_features, done)
 
             duration = next(t for m, t in env.machine_sequence[selected_job][selected_op] if m == selected_machine)
@@ -640,6 +714,8 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
 
         if done:
             reward_task, reward_machine = env.calculate_episode_rewards()
+            reward_task += episode_reward
+            reward_machine += episode_reward
             multi_agent_system.end_episode(state_features, reward_task, reward_machine, done)
             print(f"Prediction: Episode {valid_solution_count+1}/{num_predictions} processed. "
                   f"Reward Task: {reward_task}, Reward Machine: {reward_machine}, Episode every step Reward: {episode_reward}")
@@ -651,8 +727,6 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
         print(f"Warning: Only {valid_solution_count} valid solutions were collected.")
 
     return all_predictions
-
-
 
 def main():
     datasets = [

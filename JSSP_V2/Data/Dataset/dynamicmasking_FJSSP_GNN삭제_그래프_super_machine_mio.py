@@ -39,15 +39,15 @@ class DQN(nn.Module):
 
 
 class DDQNAgent:
-    def __init__(self, input_dim, action_size, update_target_frequency=10, replay_start_size=100, batch_size=80):
+    def __init__(self, input_dim, action_size, update_target_frequency=80, replay_start_size=100, batch_size=80):
         self.input_dim = input_dim
         self.action_size = action_size
         self.memory = deque(maxlen=20000000)
-        self.gamma = 0.99
+        self.gamma = 0.5
         self.epsilon = 0.99
         self.epsilon_min = 0.001
-        self.epsilon_decay = 0.995
-        self.learning_rate = 0.00005
+        self.epsilon_decay = 0.99
+        self.learning_rate = 0.00001
         self.model = DQN(input_dim, action_size)
         self.target_model = DQN(input_dim, action_size)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
@@ -59,10 +59,10 @@ class DDQNAgent:
         self.episode_count = 0
 
     def remember(self, state, action, reward, next_state, done):
-        # print(f"Action before processing: {action}")
         if isinstance(action, dict):
             action = next(iter(action.values()))
-        # print(f"Action after processing: {action}")
+        elif isinstance(action, (list, tuple)):
+            action = action[0]
         self.memory.append((state, action, reward, next_state, done))
 
     def act(self, state, valid_operations):
@@ -70,11 +70,16 @@ class DDQNAgent:
             return random.choice(valid_operations)
         
         state = torch.FloatTensor(state).unsqueeze(0)
-        act_values = self.model(state).squeeze(0)  # 차원 축소
         
-        # 유효한 operation들에 대해서만 Q-value를 고려
-        valid_q_values = {op: act_values[i].item() for i, op in enumerate(valid_operations)}
-        return max(valid_q_values, key=valid_q_values.get)
+        q_values = self.model(state).squeeze(0)
+        valid_q_indices = [i for i, op in enumerate(valid_operations) if i < self.action_size]
+        best_action_index = max(valid_q_indices, key=lambda i: q_values[i].item())
+        
+        target_q_values = self.target_model(state).squeeze(0)
+        best_action_value = target_q_values[best_action_index].item()
+        
+        return valid_operations[best_action_index]
+
 
     def update_epsilon(self, global_episode_count):
         if self.epsilon > self.epsilon_min:
@@ -89,14 +94,22 @@ class DDQNAgent:
         states, actions, rewards, next_states, done = zip(*minibatch)
 
         states = torch.FloatTensor(np.array(states))
-        # actions 처리를 수정
-        actions = [action[2] if isinstance(action, tuple) else action for action in actions]  # 튜플인 경우 machine 번호 선택
+        # print("Raw actions:", actions)
+        actions = [min(max(action, 0), self.action_size - 1) if isinstance(action, (int, np.integer)) 
+                   else min(max(next(iter(action.values())) if isinstance(action, dict) else action, 0), self.action_size - 1) 
+                   for action in actions]
+        # print("Processed actions:", actions)
         actions = torch.LongTensor(actions)
+        # print("Action tensor:", actions)
+        # print("Action tensor max:", actions.max())
+        # print("Action tensor min:", actions.min())
         rewards = torch.FloatTensor(rewards)
         next_states = torch.FloatTensor(np.array(next_states))
         done = torch.FloatTensor(done)
 
         q_values = self.model(states)
+        # print("Q-values shape:", q_values.shape)
+        
         next_q_values = self.model(next_states)
         next_q_actions = torch.argmax(next_q_values, dim=1)
         target_next_q_values = self.target_model(next_states)
@@ -217,66 +230,69 @@ class MultiAgentGraph:
         return features
 
 class SupervisorAgent(DDQNAgent):
-    def __init__(self, input_dim, action_size, update_target_frequency=10, replay_start_size=100, batch_size=80):
+    def __init__(self, input_dim, action_size, update_target_frequency=80, replay_start_size=100, batch_size=80):
         super().__init__(input_dim, action_size, update_target_frequency, replay_start_size, batch_size)
         self.used_machines = set()
-        self.last_selected_job = None
-        self.last_selected_machine = None
+        self.feature_indices = None
 
-    def update(self, machine_id, job_id):
+    def update(self, machine_id):
         self.used_machines.add(machine_id)
-        self.last_selected_job = job_id
-        self.last_selected_machine = machine_id
 
     def is_machine_used(self, machine_id):
         return machine_id in self.used_machines
 
     def reset(self):
         self.used_machines.clear()
-        self.last_selected_job = None
-        self.last_selected_machine = None
 
-    def select_machine(self, available_machines, state_features, machine_choices):
+    def remember(self, state, action, reward, next_state, done):
+        # action이 시퀀스인 경우 첫 번째 요소만 저장
+        if isinstance(action, (list, tuple)):
+            action = action[0]
+        self.memory.append((state, action, reward, next_state, done))
+
+    def set_feature_indices(self, feature_indices):
+        self.feature_indices = feature_indices
+
+    def select_machine(self, available_machines, state_features, valid_actions):
         if np.random.rand() <= self.epsilon:
             return random.choice(available_machines)
+
+        best_machine = self.apply_mio_principle(available_machines, state_features, valid_actions)
+        return best_machine
+
+    def apply_mio_principle(self, available_machines, state_features, valid_actions):
+        features = state_features['supervisor']
+        job_completion = features[self.feature_indices['job_completion']]
+
+        # valid_actions에서 각 job의 가장 앞선 operation 찾기
+        eligible_operations = {}
+        for job, op, machine in valid_actions:
+            if job not in eligible_operations or op < eligible_operations[job][1]:
+                eligible_operations[job] = (machine, op)
+
+        machine_candidates = {m: [] for m in available_machines}
+        for job, (machine, op) in eligible_operations.items():
+            if machine in available_machines:
+                machine_candidates[machine].append((job, op))
+
+        if not any(machine_candidates.values()):
+            return None
+
+        # 후보가 있는 machine 중에서 선택
+        candidate_machines = [m for m, ops in machine_candidates.items() if ops]
         
-        # 1. 현재 할당 가능한 기계들 확인
-        current_available_machines = set(available_machines)
+        if len(candidate_machines) == 1:
+            return candidate_machines[0]
 
-        # 2. Job의 다음 Operation을 선택한 기계 제외
-        next_op_machines = set()
-        for machine_id, (chosen_op, _) in machine_choices.items():
-            if chosen_op[0] == self.last_selected_job:  # 같은 Job의 다음 Operation
-                next_op_machines.add(machine_id)
-        
-        filtered_machines = current_available_machines - next_op_machines
-
-        # 3. 제외 후 남은 기계가 없다면, 전체 할당 가능한 기계로 복귀
-        if not filtered_machines:
-            filtered_machines = current_available_machines
-
-        # 4. 이전에 선택된 Job의 다음 Operation이 할당했던 기계 확인
-        last_job_next_op_machines = [m for m in filtered_machines if machine_choices[m][0][0] == self.last_selected_job]
-
-        if last_job_next_op_machines:
-            # 이전에 선택된 Job의 Operation을 수행한 기계가 있다면 우선 선택
-            if self.last_selected_machine in last_job_next_op_machines:
-                return self.last_selected_machine
-            # 그렇지 않다면 다른 기계 중 하나 선택
-            else:
-                return self.select_best_machine(last_job_next_op_machines, state_features)
-        
-        # 5. 최종적으로 선택된 기계들 중에서 하나를 선택
-        return self.select_best_machine(list(filtered_machines), state_features)
-
-    def select_best_machine(self, machines, state_features):
+        # 여러 machine 후보가 있는 경우, Q-network를 사용하여 선택
         machine_values = []
-        for machine in machines:
-            machine_state = state_features[f'M_{machine}']
-            q_values = self.model(torch.FloatTensor(machine_state).unsqueeze(0))
-            machine_values.append(q_values.max().item())
-        
-        return machines[np.argmax(machine_values)]
+        for machine in candidate_machines:
+            machine_state = torch.FloatTensor(features).unsqueeze(0)
+            q_values = self.model(machine_state)
+            machine_value = q_values[0, machine].item()
+            machine_values.append(machine_value)
+
+        return candidate_machines[np.argmax(machine_values)]
 
     def replay(self):
         if len(self.memory) < self.replay_start_size:
@@ -334,8 +350,44 @@ class MultiAgentSystem:
         self.agents = {f'M_{machine}': DDQNAgent(input_dim, self.action_size) for machine in self.machines}
         self.agents.update({f'J_{job}': DDQNAgent(input_dim, self.action_size) for job in self.jobs})
         self.supervisor = SupervisorAgent(input_dim, self.action_size)  # SupervisorAgent 초기화
+        self.set_feature_indices(sample_state)
         self.replay_start_size = 100
         self.global_episode_count = 0
+
+    def set_feature_indices(self, sample_state):
+        feature_indices = {}
+        current_index = len(self.graph.get_state_features(f'M_{self.machines[0]}'))
+        
+        feature_indices['current_time'] = current_index
+        current_index += 1
+
+        feature_indices['job_completion'] = slice(current_index, current_index + len(sample_state['job_completion']))
+        current_index += len(sample_state['job_completion'])
+
+        feature_indices['machine_available_time'] = slice(current_index, current_index + len(sample_state['machine_available_time']))
+        current_index += len(sample_state['machine_available_time'])
+
+        feature_indices['machine_utilization'] = slice(current_index, current_index + len(sample_state['machine_utilization']))
+        current_index += len(sample_state['machine_utilization'])
+
+        feature_indices['job_queue_length'] = slice(current_index, current_index + len(sample_state['job_queue_length']))
+        current_index += len(sample_state['job_queue_length'])
+
+        feature_indices['job_progress'] = slice(current_index, current_index + len(sample_state['job_progress']))
+        current_index += len(sample_state['job_progress'])
+
+        feature_indices['remaining_job_time'] = slice(current_index, current_index + len(sample_state['remaining_job_time']))
+        current_index += len(sample_state['remaining_job_time'])
+
+        feature_indices['job_op_status'] = slice(current_index, current_index + sum(len(status) for status in sample_state['job_op_status']))
+        current_index += sum(len(status) for status in sample_state['job_op_status'])
+
+        feature_indices['machine_status'] = slice(current_index, current_index + len(sample_state['machine_status']))
+
+        feature_indices['n_jobs'] = len(sample_state['job_completion'])
+        feature_indices['n_machines'] = len(sample_state['machine_status'])
+
+        self.supervisor.set_feature_indices(feature_indices)
 
     def reset(self):
         for agent in self.agents.values():
@@ -394,19 +446,21 @@ class MultiAgentSystem:
         self.global_episode_count += 1
         for agent_id, agent in self.agents.items():
             actual_action = self.actual_actions.get(agent_id, 0)
-            if isinstance(actual_action, tuple):
-                actual_action = actual_action[2]  # 튜플에서 machine 번호만 추출
+            # actual_action이 딕셔너리인 경우 값만 전달
+            if isinstance(actual_action, dict):
+                actual_action = next(iter(actual_action.values()))
             agent.remember(state_features[agent_id], actual_action, reward_task if agent_id.startswith('J_') else reward_machine, state_features[agent_id], done)
             agent.update_epsilon(self.global_episode_count)
         
+        # Supervisor의 실제 액션 저장
         supervisor_action = self.actual_actions.get('supervisor', 0)
-        if isinstance(supervisor_action, tuple):
-            supervisor_action = supervisor_action[2]  # 튜플에서 machine 번호만 추출
+        if isinstance(supervisor_action, dict):
+            supervisor_action = next(iter(supervisor_action.values()))
         self.supervisor.remember(state_features['supervisor'], supervisor_action, reward_machine, state_features['supervisor'], done)
         
         if self.memory_size() >= self.replay_start_size:
             self.replay()
-            
+
 def train_individual_models(datasets, num_episodes_per_dataset):
     for i, dataset in enumerate(datasets):
         print(f"Starting training for dataset {dataset} ({i+1}/{len(datasets)})")
@@ -420,6 +474,7 @@ def train_individual_models(datasets, num_episodes_per_dataset):
         env = JobShopEnv_FJSSP(process_times, machine_sequence, solutions=None)
         initial_state = env.reset()
 
+        # `initialize_agents` 메서드를 통해 `MultiAgentSystem`과 `SupervisorAgent` 초기화
         multi_agent_system = MultiAgentSystem(machines=range(data.n_machine), jobs=range(data.n_job), state_size=None, action_size=action_size)
         multi_agent_system.initialize_agents(initial_state)
 
@@ -467,35 +522,40 @@ def train_individual_models(datasets, num_episodes_per_dataset):
                 state_features['supervisor'] = supervisor_state_features
 
                 valid_actions = env.get_valid_actions()
-                machine_choices = {}
-                available_machines = [m for job, op, m in valid_actions]
+                machine_actions = {}
+                available_machines = [m for job, op, m in valid_actions if not multi_agent_system.supervisor.is_machine_used(m)]
+                
+                if not available_machines:
+                    multi_agent_system.supervisor.reset()
+                    available_machines = [m for job, op, m in valid_actions]
 
-                # 1. 각 machine agent가 operation 선택
-                for agent_id in multi_agent_system.agents:
-                    if agent_id.startswith('M_'):
-                        machine_id = int(agent_id.split('_')[1])
-                        if machine_id in available_machines:
-                            valid_operations = [
-                                (job, op) for job, op, machine in valid_actions if machine == machine_id
-                            ]
-                            if valid_operations:
-                                chosen_operation = multi_agent_system.agents[agent_id].act(
-                                    state_features[agent_id], valid_operations
-                                )
-                                machine_choices[machine_id] = (chosen_operation, agent_id)
-
-                # 2. SupervisorAgent가 machine 선택
                 # SupervisorAgent가 machine 선택
-                selected_machine = multi_agent_system.supervisor.select_machine(
-                    list(machine_choices.keys()), state_features, machine_choices
-                )
+                selected_machine = multi_agent_system.supervisor.select_machine(available_machines, state_features, valid_actions)
+                
+                # 선택된 machine에 대해서만 action 결정
+                selected_machine_agent_id = f'M_{selected_machine}'
+                valid_operations = []
+                for job, op, machine in valid_actions:
+                    if machine == selected_machine:
+                        valid_operations.append((job, op))
 
-                selected_job, selected_op = machine_choices[selected_machine][0]
-                selected_machine_agent_id = machine_choices[selected_machine][1]
-                action = (selected_job, selected_op, selected_machine)
+                if valid_operations:
+                    selected_operation = multi_agent_system.agents[selected_machine_agent_id].act(
+                        state_features[selected_machine_agent_id], 
+                        valid_operations
+                    )
+                    selected_job, selected_op = selected_operation
+                    action = (selected_job, selected_op, selected_machine)
+                    machine_actions[action] = multi_agent_system.agents[selected_machine_agent_id].model(
+                        torch.FloatTensor(state_features[selected_machine_agent_id]).unsqueeze(0)
+                    ).squeeze(0)[valid_operations.index(selected_operation)].item()
 
-                # SupervisorAgent 업데이트
-                multi_agent_system.supervisor.update(selected_machine, selected_job)
+                if not machine_actions:
+                    continue
+
+                best_action = max(machine_actions, key=machine_actions.get)
+                selected_job, selected_op, selected_machine = best_action
+                multi_agent_system.supervisor.update(selected_machine)
 
                 next_state, done, step_reward = env.step(selected_job, selected_op, selected_machine)
                 multi_agent_system.graph.update_graph(next_state)
@@ -531,8 +591,8 @@ def train_individual_models(datasets, num_episodes_per_dataset):
                 ))
                 next_state_features['supervisor'] = next_supervisor_state_features
 
-                multi_agent_system.remember(selected_machine_agent_id, state_features[selected_machine_agent_id], action, step_reward, next_state_features[selected_machine_agent_id], done)
-                multi_agent_system.supervisor.remember(supervisor_state_features, action, step_reward, next_supervisor_state_features, done)
+                multi_agent_system.remember(selected_machine_agent_id, state_features[selected_machine_agent_id], machine_actions[action], step_reward, next_state_features[selected_machine_agent_id], done)
+                multi_agent_system.supervisor.remember(supervisor_state_features, best_action, step_reward, next_supervisor_state_features, done)  # Supervisor도 기억
 
                 state = next_state
                 episode_reward += step_reward
@@ -543,6 +603,8 @@ def train_individual_models(datasets, num_episodes_per_dataset):
 
                 if done:
                     reward_task, reward_machine = env.calculate_episode_rewards()
+                    reward_task += episode_reward
+                    reward_machine += episode_reward
                     print(f"Training: Episode {episode+1} processed. Reward Task: {reward_task}, Reward Machine: {reward_machine}, episode reward every step: {episode_reward}")
                     break
 
@@ -560,7 +622,8 @@ def train_individual_models(datasets, num_episodes_per_dataset):
 
     return multi_agent_system, None, data.n_machine
 
-def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=100000000, epsilon=0.1):
+
+def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=100000000, epsilon=0.01):
     valid_solution_count = 0
     all_predictions = []
     step_count = 0
@@ -615,35 +678,40 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
             state_features['supervisor'] = supervisor_state_features
 
             valid_actions = env.get_valid_actions()
-            machine_choices = {}
-            available_machines = [m for job, op, m in valid_actions]
+            machine_actions = {}
+            available_machines = [m for job, op, m in valid_actions if not multi_agent_system.supervisor.is_machine_used(m)]
+            
+            if not available_machines:
+                multi_agent_system.supervisor.reset()
+                available_machines = [m for job, op, m in valid_actions]
 
-            # 1. 각 machine agent가 operation 선택
-            for agent_id in multi_agent_system.agents:
-                if agent_id.startswith('M_'):
-                    machine_id = int(agent_id.split('_')[1])
-                    if machine_id in available_machines:
-                        valid_operations = [
-                            (job, op) for job, op, machine in valid_actions if machine == machine_id
-                        ]
-                        if valid_operations:
-                            chosen_operation = multi_agent_system.agents[agent_id].act(
-                                state_features[agent_id], valid_operations
-                            )
-                            machine_choices[machine_id] = (chosen_operation, agent_id)
-
-            # 2. SupervisorAgent가 machine 선택
             # SupervisorAgent가 machine 선택
-            selected_machine = multi_agent_system.supervisor.select_machine(
-                list(machine_choices.keys()), state_features, machine_choices
-            )
+            selected_machine = multi_agent_system.supervisor.select_machine(available_machines, state_features, valid_actions)
+            
+            # 선택된 machine에 대해서만 action 결정
+            selected_machine_agent_id = f'M_{selected_machine}'
+            valid_operations = []
+            for job, op, machine in valid_actions:
+                if machine == selected_machine:
+                    valid_operations.append((job, op))
 
-            selected_job, selected_op = machine_choices[selected_machine][0]
-            selected_machine_agent_id = machine_choices[selected_machine][1]
-            action = (selected_job, selected_op, selected_machine)
+            if valid_operations:
+                selected_operation = multi_agent_system.agents[selected_machine_agent_id].act(
+                    state_features[selected_machine_agent_id], 
+                    valid_operations
+                )
+                selected_job, selected_op = selected_operation
+                action = (selected_job, selected_op, selected_machine)
+                machine_actions[action] = multi_agent_system.agents[selected_machine_agent_id].model(
+                    torch.FloatTensor(state_features[selected_machine_agent_id]).unsqueeze(0)
+                ).squeeze(0)[valid_operations.index(selected_operation)].item()
 
-            # SupervisorAgent 업데이트
-            multi_agent_system.supervisor.update(selected_machine, selected_job)
+            if not machine_actions:
+                continue
+
+            best_action = max(machine_actions, key=machine_actions.get)
+            selected_job, selected_op, selected_machine = best_action
+            multi_agent_system.supervisor.update(selected_machine)
 
             next_state, done, step_reward = env.step(selected_job, selected_op, selected_machine)
             multi_agent_system.graph.update_graph(next_state)
@@ -679,8 +747,8 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
             ))
             next_state_features['supervisor'] = next_supervisor_state_features
 
-            multi_agent_system.remember(selected_machine_agent_id, state_features[selected_machine_agent_id], action, step_reward, next_state_features[selected_machine_agent_id], done)
-            multi_agent_system.supervisor.remember(supervisor_state_features, action, step_reward, next_supervisor_state_features, done)
+            multi_agent_system.remember(selected_machine_agent_id, state_features[selected_machine_agent_id], machine_actions[action], step_reward, next_state_features[selected_machine_agent_id], done)
+            multi_agent_system.supervisor.remember(supervisor_state_features, best_action, step_reward, next_supervisor_state_features, done)
 
             duration = next(t for m, t in env.machine_sequence[selected_job][selected_op] if m == selected_machine)
             solution.append((selected_job, selected_op, selected_machine, duration))
@@ -695,6 +763,8 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
 
         if done:
             reward_task, reward_machine = env.calculate_episode_rewards()
+            reward_task += episode_reward
+            reward_machine += episode_reward
             multi_agent_system.end_episode(state_features, reward_task, reward_machine, done)
             print(f"Prediction: Episode {valid_solution_count+1}/{num_predictions} processed. "
                   f"Reward Task: {reward_task}, Reward Machine: {reward_machine}, Episode every step Reward: {episode_reward}")
@@ -706,13 +776,12 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
         print(f"Warning: Only {valid_solution_count} valid solutions were collected.")
 
     return all_predictions
-
-
+    
 def main():
     datasets = [
         'fjsspdataset/HurinkRdata7.fjs',
     ]
-    num_episodes_per_dataset = 1000
+    num_episodes_per_dataset = 300
 
     multi_agent_system, max_state_size, action_size = train_individual_models(datasets, num_episodes_per_dataset)
 
@@ -731,7 +800,7 @@ def main():
 
     logging.info("Starting prediction process.")
     print("Starting prediction process.")
-    all_predictions = predict(multi_agent_system, env, test_dataset, num_predictions=1000, max_steps=100000000)
+    all_predictions = predict(multi_agent_system, env, test_dataset, num_predictions=300, max_steps=100000000)
 
     logging.info(f"Predicted Solutions: {all_predictions}")
     print("Predicted Solutions:", all_predictions)

@@ -114,7 +114,6 @@ class JobShopEnv_FJSSP:
             'remaining_job_time': tuple(rj_t),
             'job_op_status': tuple(tuple(status) for status in self.job_op_status),
             'machine_status': tuple(self.machine_status),
-            'graph': self.graph,
             'jobs': jobs_info
         }
 
