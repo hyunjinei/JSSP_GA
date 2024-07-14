@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from RLDataset_FJSSP import RLDataset_FJSSP
-from JobShopEnv_FJSSP_machine_그래프 import JobShopEnv_FJSSP
+from JobShopEnv_FJSSP_machine_그래프_copy import JobShopEnv_FJSSP
 import matplotlib.pyplot as plt
 import logging
 import torch
@@ -21,6 +21,11 @@ import matplotlib.colors as mcolors
 
 logging.basicConfig(filename='training_progress.log', level=logging.INFO, format='%(asctime)s - %(message)s')
 
+# F.tanh, F.gelu
+def swish(x):
+    return x * torch.sigmoid(x)
+def mish(x):
+    return x * torch.tanh(F.softplus(x))
 
 class DQN(nn.Module):
     def __init__(self, input_dim, action_size):
@@ -31,9 +36,9 @@ class DQN(nn.Module):
         self.fc4 = nn.Linear(128, action_size)
 
     def forward(self, x):
-        x = torch.tanh(self.fc1(x))
-        x = torch.tanh(self.fc2(x))
-        x = torch.tanh(self.fc3(x))
+        x = F.gelu(self.fc1(x))  # GELU 사용
+        x = F.gelu(self.fc2(x))
+        x = F.gelu(self.fc3(x))
         x = self.fc4(x)
         return x
 
@@ -43,7 +48,7 @@ class DDQNAgent:
         self.input_dim = input_dim
         self.action_size = action_size
         self.memory = deque(maxlen=20000000)
-        self.gamma = 0.5
+        self.gamma = 0.9
         self.epsilon = 0.99
         self.epsilon_min = 0.001
         self.epsilon_decay = 0.99
@@ -563,7 +568,7 @@ def train_individual_models(datasets, num_episodes_per_dataset):
     return multi_agent_system, None, data.n_machine
 
 
-def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=100000000, epsilon=0.000001):
+def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=100000000, epsilon=0.0001):
     valid_solution_count = 0
     all_predictions = []
     step_count = 0
@@ -698,8 +703,8 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
             ))
             next_state_features['supervisor'] = next_supervisor_state_features
 
-            multi_agent_system.remember(selected_machine_agent_id, state_features[selected_machine_agent_id], machine_actions[action], step_reward, next_state_features[selected_machine_agent_id], done)
-            multi_agent_system.supervisor.remember(supervisor_state_features, best_action, step_reward, next_supervisor_state_features, done)
+            # multi_agent_system.remember(selected_machine_agent_id, state_features[selected_machine_agent_id], machine_actions[action], step_reward, next_state_features[selected_machine_agent_id], done)
+            # multi_agent_system.supervisor.remember(supervisor_state_features, best_action, step_reward, next_supervisor_state_features, done)
 
             duration = next(t for m, t in env.machine_sequence[selected_job][selected_op] if m == selected_machine)
             solution.append((selected_job, selected_op, selected_machine, duration))
@@ -730,13 +735,13 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
 
 def main():
     datasets = [
-        'fjsspdataset/HurinkRdata7.fjs',
+        'fjsspdataset/HurinkEdata7.fjs',
     ]
-    num_episodes_per_dataset = 300
+    num_episodes_per_dataset = 1000
 
     multi_agent_system, max_state_size, action_size = train_individual_models(datasets, num_episodes_per_dataset)
 
-    test_dataset = RLDataset_FJSSP('fjsspdataset/HurinkRdata7.fjs')
+    test_dataset = RLDataset_FJSSP('fjsspdataset/HurinkEdata7.fjs')
 
     logging.info("Training completed for individual models.")
     print("Training completed for individual models.")
@@ -751,7 +756,7 @@ def main():
 
     logging.info("Starting prediction process.")
     print("Starting prediction process.")
-    all_predictions = predict(multi_agent_system, env, test_dataset, num_predictions=300, max_steps=100000000)
+    all_predictions = predict(multi_agent_system, env, test_dataset, num_predictions=1000, max_steps=100000000)
 
     logging.info(f"Predicted Solutions: {all_predictions}")
     print("Predicted Solutions:", all_predictions)

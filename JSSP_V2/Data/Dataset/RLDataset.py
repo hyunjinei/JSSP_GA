@@ -14,6 +14,7 @@ class RLDataset:
 
         self.n_job, self.n_machine = map(int, first_line.strip().split('\t'))
         self.n_op = self.n_job * self.n_machine
+        self.total_operations = self.n_op  # total_operations 속성 추가
 
         self.op_data = []
         data = pd.read_csv(file_path, sep="\t", engine='python', encoding="cp949", skiprows=[0], header=None)

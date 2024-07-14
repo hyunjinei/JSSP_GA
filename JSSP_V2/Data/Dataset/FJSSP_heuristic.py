@@ -120,9 +120,9 @@ def draw_gantt_chart(predictions, dataset, title="Gantt Chart"):
     plt.show()
 
 def main():
-    datasets = ['fjsspdataset/BrandimarteMk6.fjs']
+    datasets = ['fjsspdataset/HurinkVdata39.fjs']
 
-    heuristics = ['SPT', 'LPT', 'MINPT', 'MAXPT', 'MWKR']
+    heuristics = ['SPT', 'LPT', 'MINPT', 'MAXPT']
 
     for dataset_path in datasets:
         dataset = RLDataset_FJSSP(dataset_path)
