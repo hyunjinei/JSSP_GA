@@ -19,7 +19,7 @@ class JobShopEnv_FJSSP:
         self.operation_view = self._init_operation_view()
         self.machine_view = self._init_machine_view()
         self.graph = self._init_graph()
-        self.reset()
+        # self.reset()
 
     def _init_graph(self):
         graph = {
@@ -212,6 +212,7 @@ class JobShopEnv_FJSSP:
         # step_reward = 10 if self.previous_idle_time is not None and current_idle_time == self.previous_idle_time else -10
         # self.previous_idle_time = current_idle_time
 
+
         step_reward = 10 if self.previous_current_time is not None and self.current_time == self.previous_current_time else -10
         self.previous_current_time = self.current_time
 
@@ -287,8 +288,8 @@ class JobShopEnv_FJSSP:
 
         print(f'Makespan: {makespan}, Idle Time: {idle_time}')
 
-        reward_task = -makespan * 0
-        reward_machine = -makespan * 0
+        reward_task = -makespan 
+        reward_machine = -makespan
 
         # if self.previous_makespan is not None:
         #     makespan_diff = self.previous_makespan - makespan

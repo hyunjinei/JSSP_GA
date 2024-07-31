@@ -183,25 +183,34 @@ class SumTree:
 
 # DuelingDQN for machine agents
 class DuelingDQN(nn.Module):
-    def __init__(self, input_dim, action_size):
+    def __init__(self, input_dim, action_size, dropout_rate=0.2):
         super(DuelingDQN, self).__init__()
         self.feature = nn.Sequential(
             nn.Linear(input_dim, 128),
-            nn.GELU(),
+            nn.LayerNorm(128),
+            nn.Tanh(),
+            nn.Dropout(dropout_rate),
             nn.Linear(128, 128),
-            nn.GELU()
+            nn.LayerNorm(128),
+            nn.Tanh(),
+            nn.Dropout(dropout_rate)
         )
         self.advantage = nn.Sequential(
             nn.Linear(128, 128),
-            nn.GELU(),
+            nn.LayerNorm(128),
+            nn.Tanh(),
+            nn.Dropout(dropout_rate),
             nn.Linear(128, action_size)
         )
         self.value = nn.Sequential(
             nn.Linear(128, 128),
-            nn.GELU(),
+            nn.LayerNorm(128),
+            nn.Tanh(),
+            nn.Dropout(dropout_rate),
             nn.Linear(128, 1)
         )
-        print(f"DuelingDQN initialized with input_dim: {input_dim}, action_size: {action_size}")  # 디버깅
+        print(f"DuelingDQN initialized with input_dim: {input_dim}, action_size: {action_size}")
+
 
     def forward(self, x):
         feature = self.feature(x)
@@ -211,15 +220,15 @@ class DuelingDQN(nn.Module):
 
 # DDQNAgent for machine agents
 class DDQNAgent:
-    def __init__(self, input_dim, action_size, update_target_frequency=200, replay_start_size=300, batch_size=100):
+    def __init__(self, input_dim, action_size, update_target_frequency=100, replay_start_size=1600, batch_size=16):
         self.input_dim = input_dim
         self.action_size = action_size
-        self.memory = SumTree(100000)
-        self.gamma = 0.5
+        self.memory = SumTree(10000)
+        self.gamma = 0
         self.epsilon = 0.99
         self.epsilon_min = 0.001
         self.epsilon_decay = 0.999
-        self.learning_rate = 0.00001
+        self.learning_rate = 0.0001
         self.model = DuelingDQN(input_dim, action_size)
         self.target_model = DuelingDQN(input_dim, action_size)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
@@ -297,7 +306,7 @@ class DDQNAgent:
     def update_epsilon(self, global_episode_count):
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
-        # print(f"Epsilon updated: {self.epsilon}")  # 디버깅
+        print(f"Epsilon updated: {self.epsilon}")  # 디버깅
 
     def replay(self):
         if self.memory.n_entries < self.replay_start_size:
@@ -389,9 +398,15 @@ class DDQNAgent:
         torch.save(self.model.state_dict(), name)
         # print(f"Model saved to {name}")  # 디버깅
 
+    def set_train_mode(self):
+        self.model.train()
+        self.target_model.train()
+        print("Model set to training mode")
+
     def set_eval_mode(self):
         self.model.eval()
-        # print("Model set to evaluation mode")  # 디버깅
+        self.target_model.eval()
+        print("Model set to training mode")
 
 # SumTree_super for supervisor agent
 class SumTree_super:
@@ -443,23 +458,31 @@ class SumTree_super:
 
 # DuelingDQN_super for supervisor agent
 class DuelingDQN_super(nn.Module):
-    def __init__(self, input_dim, action_size):
+    def __init__(self, input_dim, action_size, dropout_rate=0.2):
         super(DuelingDQN_super, self).__init__()
         self.feature = nn.Sequential(
-            nn.Linear(input_dim, 256),
-            nn.GELU(),
-            nn.Linear(256, 256),
-            nn.GELU()
+            nn.Linear(input_dim, 128),
+            nn.LayerNorm(128),
+            nn.Tanh(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(128, 128),
+            nn.LayerNorm(128),
+            nn.Tanh(),
+            nn.Dropout(dropout_rate)
         )
         self.advantage = nn.Sequential(
-            nn.Linear(256, 256),
-            nn.GELU(),
-            nn.Linear(256, action_size)
+            nn.Linear(128, 128),
+            nn.LayerNorm(128),
+            nn.Tanh(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(128, action_size)
         )
         self.value = nn.Sequential(
-            nn.Linear(256, 256),
-            nn.GELU(),
-            nn.Linear(256, 1)
+            nn.Linear(128, 128),
+            nn.LayerNorm(128),
+            nn.Tanh(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(128, 1)
         )
         # print(f"DuelingDQN_super initialized with input_dim: {input_dim}, action_size: {action_size}")  # 디버깅
 
@@ -471,15 +494,15 @@ class DuelingDQN_super(nn.Module):
 
 # DDQNAgent_super for supervisor agent
 class DDQNAgent_super:
-    def __init__(self, input_dim, action_size, update_target_frequency=200, replay_start_size=300, batch_size=100):
+    def __init__(self, input_dim, action_size, update_target_frequency=100, replay_start_size=8000, batch_size=16):
         self.input_dim = input_dim
         self.action_size = action_size
-        self.memory = SumTree_super(100000)
+        self.memory = SumTree_super(10000)
         self.gamma = 0.9
         self.epsilon = 0.99
         self.epsilon_min = 0.001
         self.epsilon_decay = 0.999
-        self.learning_rate = 0.00001
+        self.learning_rate = 0.0001
         self.model = DuelingDQN_super(input_dim, action_size)
         self.target_model = DuelingDQN_super(input_dim, action_size)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
@@ -638,9 +661,15 @@ class DDQNAgent_super:
         torch.save(self.model.state_dict(), name)
         # print(f"Model saved to {name}")  # 디버깅
 
+    def set_train_mode(self):
+        self.model.train()
+        self.target_model.train()
+        print("Supervisor model set to training mode")
+
     def set_eval_mode(self):
         self.model.eval()
-        # print("Model set to evaluation mode")  # 디버깅
+        self.target_model.eval()
+        print("Supervisor model set to evaluation mode")
 
 class MultiAgentSystem:
     def __init__(self, machines, jobs, state_size, action_size):
@@ -650,7 +679,7 @@ class MultiAgentSystem:
         self.action_size = action_size
         self.agents = {}
         self.supervisor = None
-        self.replay_start_size = 300
+        # self.replay_start_size = 1000
         self.global_episode_count = 0
         self.actual_actions = {}
         print(f"MultiAgentSystem initialized with {len(machines)} machines and {len(jobs)} jobs")  # 디버깅
@@ -669,10 +698,13 @@ class MultiAgentSystem:
         env_state_dim = (
             1 +  # current_time
             len(state['job_completion']) +
-            # len(state['job_queue_length']) +
+            len(state['machine_available_time']) +
+            len(state['machine_utilization']) +
+            len(state['job_queue_length']) +
             len(state['job_progress']) +
-            # len(state['remaining_job_time'])
-            sum(len(status) for status in state['job_op_status'])
+            len(state['remaining_job_time']) +
+            sum(len(status) for status in state['job_op_status']) +
+            len(state['machine_status'])
         )
         total_dim = machine_features_dim + env_state_dim
         print(f"Calculated input dimension for machine agents: {total_dim}")  # 디버깅 출력 추가
@@ -682,13 +714,13 @@ class MultiAgentSystem:
         machine_features_dim = len(self.graph.get_state_features(f'J_0'))  # get_machine_features를 get_state_features로 변경
         env_state_dim = (
             1 +  # current_time
-            # len(state['job_completion']) +
+            len(state['job_completion']) +
             len(state['machine_available_time']) +
             len(state['machine_utilization']) +
-            # len(state['job_queue_length']) +
-            # len(state['job_progress']) +
-            # len(state['remaining_job_time'])
-            # sum(len(status) for status in state['job_op_status']) +
+            len(state['job_queue_length']) +
+            len(state['job_progress']) +
+            len(state['remaining_job_time']) +
+            sum(len(status) for status in state['job_op_status']) +
             len(state['machine_status'])
         )
         total_dim = machine_features_dim + env_state_dim
@@ -696,21 +728,21 @@ class MultiAgentSystem:
         return total_dim
 
     def calculate_supervisor_input_dim(self, state):
-        # machine_features = sum(len(self.graph.get_state_features(f'M_{i}')) for i in self.machines)
+        machine_features = sum(len(self.graph.get_state_features(f'M_{i}')) for i in self.machines)
         job_features = sum(len(self.graph.get_state_features(f'J_{j}')) for j in self.jobs)
         env_state_length = (
             1 +  # current_time
             len(state['job_completion']) +
-            # len(state['machine_available_time']) +
-            # len(state['machine_utilization']) +
-            # len(state['job_queue_length']) +
+            len(state['machine_available_time']) +
+            len(state['machine_utilization']) +
+            len(state['job_queue_length']) +
             len(state['job_progress']) +
-            # len(state['remaining_job_time']) +
+            len(state['remaining_job_time']) +
             sum(len(status) for status in state['job_op_status']) +
             len(state['machine_status'])
         )
-        # total_dim = machine_features + job_features + env_state_length
-        total_dim = job_features + env_state_length
+        total_dim = machine_features + job_features + env_state_length
+        # total_dim = job_features + env_state_length
         return total_dim
 
     def reset(self, reset_epsilon=True):
@@ -719,6 +751,7 @@ class MultiAgentSystem:
                 agent.epsilon = 0.999  # 에이전트의 탐험률 초기화 (필요에 따라 조정)
             self.supervisor.epsilon = 0.999  # SupervisorAgent의 탐험률 초기화
         self.supervisor.reset()  # SupervisorAgent 초기화
+        self.set_train_mode()  # 학습 모드로 설정
 
     def reset_predict(self, reset_epsilon=True):
         for agent in self.agents.values():
@@ -727,6 +760,8 @@ class MultiAgentSystem:
         if reset_epsilon:
             self.supervisor.epsilon = 0.01 # SupervisorAgent의 탐험률 초기화
         self.supervisor.reset()  # SupervisorAgent 초기화
+        self.set_eval_mode()  # 평가 모드로 설정
+
 
     def act(self, state, valid_actions):
         self.graph.update_graph(state)
@@ -748,13 +783,13 @@ class MultiAgentSystem:
         env_state = np.concatenate([
             np.array([state['current_time']]),
             state['job_completion'],
-            # state['machine_available_time'],
-            # state['machine_utilization'],
-            # state['job_queue_length'],
+            state['machine_available_time'],
+            state['machine_utilization'],
+            state['job_queue_length'],
             state['job_progress'],
-            # state['remaining_job_time'],
+            state['remaining_job_time'],
             np.array([status for job_status in state['job_op_status'] for status in job_status]),
-            # np.array(state['machine_status'], dtype=int)
+            np.array(state['machine_status'], dtype=int)
         ])
         # print(f"Machine features shape: {np.array(machine_features).shape}")  # 디버깅 출력
         # print(f"Env state shape: {env_state.shape}")  # 디버깅 출력
@@ -784,16 +819,16 @@ class MultiAgentSystem:
         env_features = [
             state['current_time'],
             *state['job_completion'],
-            # *state['machine_available_time'],
-            # *state['machine_utilization'],
-            # *state['job_queue_length'],
+            *state['machine_available_time'],
+            *state['machine_utilization'],
+            *state['job_queue_length'],
             *state['job_progress'],
-            # *state['remaining_job_time'],
+            *state['remaining_job_time'],
             *[status for job_status in state['job_op_status'] for status in job_status],
             *state['machine_status']
         ]
         features = machine_features + job_features + env_features
-        features = job_features + env_features
+        # features = job_features + env_features
        
         return features
 
@@ -812,7 +847,7 @@ class MultiAgentSystem:
                 agent.replay()
         if self.supervisor.memory.n_entries >= self.supervisor.replay_start_size:
             self.supervisor.replay()
-        # print("Replay performed for all eligible agents and supervisor")  # 디버깅
+        # print("Replay performed for all eligible agents and supervisor")
 
     def update_target_models(self):
         for agent in self.agents.values():
@@ -843,6 +878,18 @@ class MultiAgentSystem:
         # print(f"Total memory size: {total_size}")  # 디버깅
         return total_size
 
+    def set_train_mode(self):
+        for agent in self.agents.values():
+            agent.set_train_mode()
+        self.supervisor.set_train_mode()
+        print("supervisor set to training mode")
+
+    def set_eval_mode(self):
+        for agent in self.agents.values():
+            agent.set_eval_mode()
+        self.supervisor.set_eval_mode()
+        print("supervisor set to evaluation mode")
+
     def end_episode(self, state, done, is_training=True):
         if is_training:
             self.global_episode_count += 1
@@ -857,13 +904,13 @@ class MultiAgentSystem:
                         machine_features,
                         np.array([state['current_time']]),
                         np.array(state['job_completion']),
-                        # np.array(state['machine_available_time']),
-                        # np.array(state['machine_utilization']),
-                        # np.array(state['job_queue_length']),
+                        np.array(state['machine_available_time']),
+                        np.array(state['machine_utilization']),
+                        np.array(state['job_queue_length']),
                         np.array(state['job_progress']),
-                        # np.array(state['remaining_job_time']),
+                        np.array(state['remaining_job_time']),
                         np.array([status for job_status in state['job_op_status'] for status in job_status]),
-                        # np.array(state['machine_status'], dtype=int)
+                        np.array(state['machine_status'], dtype=int)
                     ))
                 elif agent_id.startswith('J_'):
                     job_features = self.graph.get_job_features(agent_id)
@@ -872,13 +919,13 @@ class MultiAgentSystem:
                     state_features[agent_id] = np.concatenate((
                         job_features,
                         np.array([state['current_time']]),
-                        # np.array(state['job_completion']),
+                        np.array(state['job_completion']),
                         np.array(state['machine_available_time']),
                         np.array(state['machine_utilization']),
-                        # np.array(state['job_queue_length']),
-                        # np.array(state['job_progress']),
-                        # np.array(state['remaining_job_time']),
-                        # np.array([status for job_status in state['job_op_status'] for status in job_status]),
+                        np.array(state['job_queue_length']),
+                        np.array(state['job_progress']),
+                        np.array(state['remaining_job_time']),
+                        np.array([status for job_status in state['job_op_status'] for status in job_status]),
                         np.array(state['machine_status'], dtype=int)
                     ))
             supervisor_features = self.get_supervisor_features(state)
@@ -898,9 +945,13 @@ class MultiAgentSystem:
             # self.supervisor.remember(supervisor_features, supervisor_action, reward_machine, supervisor_features, done)
             self.supervisor.update_epsilon(self.global_episode_count)
 
-            if self.memory_size() >= self.replay_start_size:
-                self.replay()
-        
+            for agent in self.agents.values():
+                if agent.memory.n_entries >= agent.replay_start_size:
+                    agent.replay()
+            
+            if self.supervisor.memory.n_entries >= self.supervisor.replay_start_size:
+                self.supervisor.replay()
+            
         print(f"Episode {self.global_episode_count} ended.")  # 디버깅
         # print(f"Episode {self.global_episode_count} ended. Reward task: {reward_task}, Reward machine: {reward_machine}")  # 디버깅
 
@@ -944,6 +995,9 @@ def train_individual_models(datasets, num_episodes_per_dataset):
         print(f"Supervisor epsilon value before reset: {multi_agent_system.supervisor.epsilon}")
         multi_agent_system.reset(reset_epsilon=False)
         print(f"Supervisor epsilon value after reset: {multi_agent_system.supervisor.epsilon}")
+
+        # 학습 모드로 설정
+        multi_agent_system.set_train_mode()  # 학습 시작 전 한 번만 호출
 
 
         for episode in range(num_episodes_per_dataset):
@@ -1043,6 +1097,7 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
     agent_load_paths['supervisor'] = "supervisor.pth"
 
     multi_agent_system.load(agent_load_paths)
+    multi_agent_system.set_eval_mode()  # 예측 시작 전 호출
 
     while valid_solution_count < num_predictions and step_count < max_steps:
         state = env.reset()
@@ -1143,7 +1198,7 @@ def main():
 
     logging.info("Starting prediction process.")
     print("Starting prediction process.")
-    all_predictions = predict(multi_agent_system, env, test_dataset, num_predictions=10, max_steps=100000000)
+    all_predictions = predict(multi_agent_system, env, test_dataset, num_predictions=300, max_steps=100000000)
 
     logging.info(f"Predicted Solutions: {all_predictions}")
     print("Predicted Solutions:", all_predictions)
