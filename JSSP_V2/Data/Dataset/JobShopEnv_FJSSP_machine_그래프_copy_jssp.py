@@ -207,18 +207,29 @@ class JobShopEnv_JSSP:
 
         done = all(c == len(self.machine_sequence[job]) for c in self.job_completion)
 
-        # current_idle_time = calculate_idle_time(self.agent_actions, self)
+        current_idle_time = calculate_idle_time(self.agent_actions, self)
         # step_reward = 1 if self.previous_idle_time is not None and current_idle_time == self.previous_idle_time else -1
         # self.previous_idle_time = current_idle_time
-
-        step_reward = 1 if self.previous_current_time is not None and self.current_time == self.previous_current_time else 0
+        if self.previous_current_time is not None:
+            if self.current_time == self.previous_current_time:
+                step_reward = 10
+            else:
+                step_reward = self.previous_current_time - self.current_time
+        else:
+            step_reward = 0
         self.previous_current_time = self.current_time
 
-        # step_reward = 1/self.current_time
+        # step_reward = 1/(self.current_time+1)
         # self.previous_current_time = self.current_time
-
+        # step_reward = self.previous_current_time - self.current_time if self.previous_current_time is not None and self.current_time == self.previous_current_time else 0
+        # self.previous_current_time = self.current_time
+        # if self.previous_current_time is not None:
+        #     step_reward = self.previous_current_time - self.current_time
+        # else:
+        #     step_reward = 0
 
         self.state = self.get_state()
+
         # print(f"Updated state after get_state: {self.state}")  # 추가된 상태 출력
         return self.state, done, step_reward
 
@@ -297,13 +308,7 @@ class JobShopEnv_JSSP:
         #         reward_machine += 1000
         #     else:
         #         reward_task += -1000
-        #         reward_machine += -1000  
-
-        if self.previous_makespan is not None:
-            makespan_diff = self.previous_makespan - makespan
-            reward_task += makespan_diff
-            reward_machine += makespan_diff
-            print(f'Makespan difference: {makespan_diff}, Adjusted Reward Task: {reward_task}')
+        #         reward_machine += -1000      
 
         # if self.previous_epi_idle_time is not None:
         #     idle_time_diff = self.previous_epi_idle_time - idle_time

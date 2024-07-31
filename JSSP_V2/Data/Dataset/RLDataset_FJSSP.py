@@ -49,6 +49,7 @@ class RLDataset_FJSSP:
         print(f"Total operations: {self.total_operations}")
         print(f"Max operation counts: {self.max_op_counts}")
         print(f"op data: {self.op_data}")
+        
 def load_all_datasets(filenames):
     datasets = []
     for filename in filenames:

@@ -84,13 +84,15 @@ class JobShopEnv_FJSSP:
                 'waiting_machines': set(),
                 'routing_machines': set(),
             }
-            current_op = self.graph['jobs'][f'J_{job}']['current_op']
+            current_op = self.job_completion[job]
             if current_op < len(self.machine_sequence[job]):
                 for op, machines in enumerate(self.machine_sequence[job]):
                     if op == current_op:
                         job_info['waiting_machines'].update([m for m, _ in machines])
                     elif op > current_op:
                         job_info['routing_machines'].update([m for m, _ in machines])
+            if current_op > 0:
+                job_info['current_machine'] = self.agent_actions[-1][2] if self.agent_actions[-1][0] == job else None
             jobs_info[f'J_{job}'] = job_info
 
         machine_available_time_dict = {i: self.machine_available_time[i] for i in range(len(self.machine_available_time))}
@@ -285,8 +287,8 @@ class JobShopEnv_FJSSP:
 
         print(f'Makespan: {makespan}, Idle Time: {idle_time}')
 
-        reward_task = -makespan * 1
-        reward_machine = -makespan * 1
+        reward_task = -makespan * 0
+        reward_machine = -makespan * 0
 
         # if self.previous_makespan is not None:
         #     makespan_diff = self.previous_makespan - makespan

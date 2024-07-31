@@ -417,12 +417,10 @@ class MultiAgentSystem:
     def load(self, names):
         for agent_id, name in names.items():
             self.agents[agent_id].load(name)
-        self.supervisor.load(names['supervisor'])
 
     def save(self, names):
         for agent_id, name in names.items():
             self.agents[agent_id].save(name)
-        self.supervisor.save(names['supervisor'])
 
     def memory_size(self):
         return sum(agent.memory.n_entries for agent in self.agents.values()) + self.supervisor.memory.n_entries
@@ -764,7 +762,7 @@ def main():
     datasets = [
         'fjsspdataset/HurinkEdata7.fjs',
     ]
-    num_episodes_per_dataset = 1000
+    num_episodes_per_dataset = 100
 #abz5
     multi_agent_system, max_state_size, action_size = train_individual_models(datasets, num_episodes_per_dataset)
 

@@ -359,25 +359,27 @@ class MultiAgentSystem:
         self.global_episode_count = 0
 
     def calculate_input_dim(self, state):
-        # 모든 머신 에이전트에 대한 그래프 특징 길이 계산
         machine_graph_features_length = sum(
             len(self.graph.get_state_features(f'M_{i}')) for i in range(len(self.machines))
         )
-        # 환경 상태 길이 계산
         env_state_length = (
-            # len(state['job_completion']) +
+            1 +  # current_time
+            len(state['job_completion']) +
             len(state['machine_available_time']) +
-            # len(state['job_progress']) +
-            # len(state['remaining_job_time']) +
+            len(state['machine_utilization']) +
+            len(state['job_queue_length']) +
+            len(state['job_progress']) +
+            len(state['remaining_job_time']) +
             sum(len(status) for status in state['job_op_status'])
-            # len(state['machine_status'])
         )
         return machine_graph_features_length + env_state_length
 
-    def reset(self):
+    def reset(self, reset_epsilon=True):
         for agent in self.agents.values():
-            agent.epsilon = 0.99  # 에이전트의 탐험률 초기화 (필요에 따라 조정)
-        self.supervisor.epsilon = 0.99  # SupervisorAgent의 탐험률 초기화
+            if reset_epsilon:
+                agent.epsilon = 0.999  # 에이전트의 탐험률 초기화 (필요에 따라 조정)
+        if reset_epsilon:
+            self.supervisor.epsilon = 0.999  # SupervisorAgent의 탐험률 초기화
         self.supervisor.reset()  # SupervisorAgent 초기화
 
     def act(self, state, mask):
@@ -385,25 +387,21 @@ class MultiAgentSystem:
         for agent_id in self.agents:
             features = self.graph.get_state_features(agent_id)
             actions[agent_id] = self.agents[agent_id].act(features, mask)
-        state_features = {agent_id: self.graph.get_state_features(agent_id) for agent_id in self.agents}
-        state_features['supervisor'] = self.graph.get_state_features('supervisor')
-        available_machines = [m for m in self.machines if not self.supervisor.is_machine_used(m)]
-        actions['supervisor'] = self.supervisor.select_machine(available_machines, state_features)
         return actions
 
     def remember(self, agent_id, state, action, reward, next_state, done):
-        if agent_id == 'supervisor':
-            self.supervisor.remember(state, action, reward, next_state, done)
-        else:
-            if isinstance(action, dict):
-                action = next(iter(action.values()))
-            self.agents[agent_id].remember(state, action, reward, next_state, done)
+        if isinstance(action, dict):
+            action = next(iter(action.values()))
+        self.agents[agent_id].remember(state, action, reward, next_state, done)
 
     def replay(self):
         for agent_id, agent in self.agents.items():
             if len(agent.memory.data) >= agent.replay_start_size:
                 agent.replay()
-        self.supervisor.replay()
+                print(f"Machine agent {agent_id} replay called")
+        if len(self.supervisor.memory.data) >= self.supervisor.replay_start_size:
+            self.supervisor.replay()
+            print("Supervisor replay called")
 
     def update_target_models(self):
         for agent in self.agents.values():
@@ -412,13 +410,17 @@ class MultiAgentSystem:
 
     def load(self, names):
         for agent_id, name in names.items():
-            self.agents[agent_id].load(name)
-        self.supervisor.load(names['supervisor'])
-
+            if agent_id == 'supervisor':
+                self.supervisor.load(name)
+            else:
+                self.agents[agent_id].load(name)
+                
     def save(self, names):
         for agent_id, name in names.items():
-            self.agents[agent_id].save(name)
-        self.supervisor.save(names['supervisor'])
+            if agent_id == 'supervisor':
+                self.supervisor.save(name)
+            else:
+                self.agents[agent_id].save(name)
 
     def memory_size(self):
         return sum(agent.memory.n_entries for agent in self.agents.values()) + self.supervisor.memory.n_entries
@@ -431,17 +433,29 @@ class MultiAgentSystem:
                 actual_action = next(iter(actual_action.values()))
             agent.remember(state_features[agent_id], actual_action, reward_task if agent_id.startswith('J_') else reward_machine, state_features[agent_id], done)
             agent.update_epsilon(self.global_episode_count)
-        
+
         supervisor_action = self.actual_actions.get('supervisor', 0)
         if isinstance(supervisor_action, dict):
             supervisor_action = next(iter(supervisor_action.values()))
         self.supervisor.remember(state_features['supervisor'], supervisor_action, reward_machine, state_features['supervisor'], done)
-        
+        self.supervisor.update_epsilon(self.global_episode_count)
+
+        # epsilon 값 출력
+        print(f"Global episode count: {self.global_episode_count}")
+        print(f"Supervisor epsilon: {self.supervisor.epsilon}")
+        for agent_id, agent in self.agents.items():
+            print(f"Agent {agent_id} epsilon: {agent.epsilon}")
+
         if self.memory_size() >= self.replay_start_size:
             self.replay()
 
 
 def train_individual_models(datasets, num_episodes_per_dataset):
+    # 초기 데이터셋으로 multi_agent_system 초기화
+    data = RLDataset(datasets[0])
+    action_size = data.total_operations
+    multi_agent_system = MultiAgentSystem(machines=range(data.n_machine), jobs=range(data.n_job), state_size=None, action_size=action_size)
+    
     for i, dataset in enumerate(datasets):
         print(f"Starting training for dataset {dataset} ({i+1}/{len(datasets)})")
 
@@ -460,16 +474,22 @@ def train_individual_models(datasets, num_episodes_per_dataset):
                 job_machine_sequence.append(m)
             process_times.append(job_process_times)
             machine_sequence.append(job_machine_sequence)
-        
+
         env = JobShopEnv_JSSP(process_times, machine_sequence, solutions=None)
         initial_state = env.reset()
+        
+        # 이전 모델을 로드
+        if i > 0:
+            agent_save_paths = {agent_id: f"{agent_id}_jssp.pth" for agent_id in multi_agent_system.agents.keys()}
+            agent_save_paths['supervisor'] = "supervisor_jssp.pth"
+            multi_agent_system.load(agent_save_paths)
 
-        multi_agent_system = MultiAgentSystem(machines=range(data.n_machine), jobs=range(data.n_job), state_size=None, action_size=action_size)
+        # 모델을 초기화하지 않고, 그대로 사용
         multi_agent_system.initialize_agents(initial_state)
 
         for episode in range(num_episodes_per_dataset):
             state = env.reset()
-            multi_agent_system.reset()
+            multi_agent_system.reset(reset_epsilon=False)  # epsilon을 초기화하지 않음
             done = False
             episode_reward = 0
             step_count = 0
@@ -486,16 +506,14 @@ def train_individual_models(datasets, num_episodes_per_dataset):
                 for agent_id in multi_agent_system.agents:
                     combined_features = np.concatenate((
                         machine_graph_features,
-                        # np.array([state['current_time']]),
-                        # np.array([state['lowerbound']]),
-                        # state['job_completion'],
+                        np.array([state['current_time']]),
+                        state['job_completion'],
                         state['machine_available_time'],
-                        # state['machine_utilization'],
-                        # state['job_queue_length'],
-                        # state['job_progress'],
-                        # state['remaining_job_time'],
-                        np.array([status for job_status in state['job_op_status'] for status in job_status]),
-                        # np.array(state['machine_status'], dtype=int)
+                        state['machine_utilization'],
+                        state['job_queue_length'],
+                        state['job_progress'],
+                        state['remaining_job_time'],
+                        np.array([status for job_status in state['job_op_status'] for status in job_status])
                     ))
                     state_features[agent_id] = combined_features
                     if episode == 0 and step_count == 0:
@@ -504,16 +522,14 @@ def train_individual_models(datasets, num_episodes_per_dataset):
 
                 supervisor_combined_features = np.concatenate((
                     machine_graph_features,
-                    # np.array([state['current_time']]),
-                    # np.array([state['lowerbound']]),
-                    # state['job_completion'],
+                    np.array([state['current_time']]),
+                    state['job_completion'],
                     state['machine_available_time'],
-                    # state['machine_utilization'],
-                    # state['job_queue_length'],
-                    # state['job_progress'],
-                    # state['remaining_job_time'],
-                    np.array([status for job_status in state['job_op_status'] for status in job_status]),
-                    # np.array(state['machine_status'], dtype=int)
+                    state['machine_utilization'],
+                    state['job_queue_length'],
+                    state['job_progress'],
+                    state['remaining_job_time'],
+                    np.array([status for job_status in state['job_op_status'] for status in job_status])
                 ))
                 state_features['supervisor'] = supervisor_combined_features
 
@@ -561,16 +577,14 @@ def train_individual_models(datasets, num_episodes_per_dataset):
                 for agent_id in multi_agent_system.agents:
                     combined_features = np.concatenate((
                         machine_graph_features,
-                        # np.array([next_state['current_time']]),
-                        # np.array([next_state['lowerbound']]),
-                        # next_state['job_completion'],
+                        np.array([next_state['current_time']]),
+                        next_state['job_completion'],
                         next_state['machine_available_time'],
-                        # next_state['machine_utilization'],
-                        # next_state['job_queue_length'],
-                        # next_state['job_progress'],
-                        # next_state['remaining_job_time'],
-                        np.array([status for job_status in next_state['job_op_status'] for status in job_status]),
-                        # np.array(next_state['machine_status'], dtype=int)
+                        next_state['machine_utilization'],
+                        next_state['job_queue_length'],
+                        next_state['job_progress'],
+                        next_state['remaining_job_time'],
+                        np.array([status for job_status in next_state['job_op_status'] for status in job_status])
                     ))
                     next_state_features[agent_id] = combined_features
 
@@ -588,8 +602,8 @@ def train_individual_models(datasets, num_episodes_per_dataset):
 
                 if done:
                     reward_task, reward_machine = env.calculate_episode_rewards()
-                    # reward_task += episode_reward
-                    # reward_machine += episode_reward
+                    reward_task += episode_reward
+                    reward_machine += episode_reward
                     print(f"Training: Episode {episode+1} processed. Reward Task: {reward_task}, Reward Machine: {reward_machine}, episode reward every step: {episode_reward}")
                     break
 
@@ -599,33 +613,37 @@ def train_individual_models(datasets, num_episodes_per_dataset):
                 print(f"Episode {episode}/{num_episodes_per_dataset} completed for dataset {dataset}")
                 gc.collect()
 
+        # 모델 저장
+        agent_save_paths = {agent_id: f"{agent_id}_jssp.pth" for agent_id in multi_agent_system.agents.keys()}
+        agent_save_paths['supervisor'] = "supervisor_jssp.pth"
+        multi_agent_system.save(agent_save_paths)
         print(f"Completed training for dataset {dataset} ({i+1}/{len(datasets)})")
         gc.collect()
-
-    agent_save_paths = {agent_id: f"{agent_id}.pth" for agent_id in multi_agent_system.agents.keys()}
-    multi_agent_system.save(agent_save_paths)
 
     return multi_agent_system, None, data.n_machine
 
 
-
-def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=100000000, epsilon=0.0001):
+def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=100000000):
     valid_solution_count = 0
     all_predictions = []
     step_count = 0
 
-    for agent in multi_agent_system.agents.values():
-        agent.epsilon = epsilon
-        agent.set_eval_mode()
-    multi_agent_system.supervisor.epsilon = epsilon
-    multi_agent_system.supervisor.set_eval_mode()
+    # 모델을 로드
+    agent_save_paths = {agent_id: f"{agent_id}_jssp.pth" for agent_id in multi_agent_system.agents.keys()}
+    agent_save_paths['supervisor'] = "supervisor_jssp.pth"
+    multi_agent_system.load(agent_save_paths)
+
+    # 평가 모드로 전환하지 않음
+    # for agent in multi_agent_system.agents.values():
+    #     agent.set_eval_mode()
+    # multi_agent_system.supervisor.set_eval_mode()
 
     while valid_solution_count < num_predictions and step_count < max_steps:
         state = env.reset()
         solution = []
         done = False
         episode_reward = 0
-        multi_agent_system.reset()
+        multi_agent_system.reset(reset_epsilon=False)  # epsilon을 초기화하지 않음
 
         while not done and step_count < max_steps:
             state = env.get_state()
@@ -639,29 +657,29 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
             for agent_id in multi_agent_system.agents:
                 combined_features = np.concatenate((
                     machine_graph_features,
-                    # np.array([state['current_time']]),
-                    # state['job_completion'],
+                    np.array([state['current_time']]),
+                    state['job_completion'],
                     state['machine_available_time'],
-                    # state['machine_utilization'],
-                    # state['job_queue_length'],
-                    # state['job_progress'],
-                    # state['remaining_job_time'],
+                    state['machine_utilization'],
+                    state['job_queue_length'],
+                    state['job_progress'],
+                    state['remaining_job_time'],
                     np.array([status for job_status in state['job_op_status'] for status in job_status]),
-                    # np.array(state['machine_status'], dtype=int)
+                    np.array(state['machine_status'], dtype=int)
                 ))
                 state_features[agent_id] = combined_features
 
             supervisor_combined_features = np.concatenate((
                 machine_graph_features,
-                # np.array([state['current_time']]),
-                # state['job_completion'],
+                np.array([state['current_time']]),
+                state['job_completion'],
                 state['machine_available_time'],
-                # state['machine_utilization'],
-                # state['job_queue_length'],
-                # state['job_progress'],
-                # state['remaining_job_time'],
+                state['machine_utilization'],
+                state['job_queue_length'],
+                state['job_progress'],
+                state['remaining_job_time'],
                 np.array([status for job_status in state['job_op_status'] for status in job_status]),
-                # np.array(state['machine_status'], dtype=int)
+                np.array(state['machine_status'], dtype=int)
             ))
             state_features['supervisor'] = supervisor_combined_features
 
@@ -705,15 +723,15 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
             for agent_id in multi_agent_system.agents:
                 combined_features = np.concatenate((
                     machine_graph_features,
-                    # np.array([next_state['current_time']]),
-                    # next_state['job_completion'],
+                    np.array([next_state['current_time']]),
+                    next_state['job_completion'],
                     next_state['machine_available_time'],
-                    # next_state['machine_utilization'],
-                    # next_state['job_queue_length'],
-                    # next_state['job_progress'],
-                    # next_state['remaining_job_time'],
+                    next_state['machine_utilization'],
+                    next_state['job_queue_length'],
+                    next_state['job_progress'],
+                    next_state['remaining_job_time'],
                     np.array([status for job_status in next_state['job_op_status'] for status in job_status]),
-                    # np.array(next_state['machine_status'], dtype=int)
+                    np.array(next_state['machine_status'], dtype=int)
                 ))
                 next_state_features[agent_id] = combined_features
 
@@ -732,8 +750,8 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
 
         if done:
             reward_task, reward_machine = env.calculate_episode_rewards()
-            # reward_task += episode_reward
-            # reward_machine += episode_reward
+            reward_task += episode_reward
+            reward_machine += episode_reward
             multi_agent_system.end_episode(state_features, reward_task, reward_machine, done)
             print(f"Prediction: Episode {valid_solution_count+1}/{num_predictions} processed. "
                   f"Reward Task: {reward_task}, Reward Machine: {reward_machine}, Episode every step Reward: {episode_reward}")
@@ -749,11 +767,11 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
 
 
 def main():
-    datasets = ['la03.txt']
-    num_episodes_per_dataset = 1000
+    datasets = ['ft06.txt']
+    num_episodes_per_dataset = 10
     multi_agent_system, max_state_size, action_size = train_individual_models(datasets, num_episodes_per_dataset)
 
-    test_dataset = RLDataset('la03.txt')
+    test_dataset = RLDataset('ft06.txt')
 
     logging.info("Training completed for individual models.")
     print("Training completed for individual models.")
@@ -779,7 +797,7 @@ def main():
 
     logging.info("Starting prediction process.")
     print("Starting prediction process.")
-    all_predictions = predict(multi_agent_system, env, test_dataset, num_predictions=1000, max_steps=100000000)
+    all_predictions = predict(multi_agent_system, env, test_dataset, num_predictions=100, max_steps=100000000)
 
     logging.info(f"Predicted Solutions: {all_predictions}")
     print("Predicted Solutions:", all_predictions)
