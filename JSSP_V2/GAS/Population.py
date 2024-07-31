@@ -204,8 +204,11 @@ class Population:
         self.op_data = op_data
         if random_seed is not None:
             random.seed(random_seed)
-            np.random.seed(random_seed)        
-        self.individuals = [Individual(config, seq=random.sample(range(config.n_op), config.n_op), op_data=op_data) for _ in range(config.population_size)]
+            np.random.seed(random_seed)
+        
+        self.individuals = [Individual(config, seq=random.sample(range(config.n_job), config.n_job), op_data=op_data) for _ in range(config.population_size)]
+        for ind in self.individuals:
+            random.shuffle(ind.seq)
 
     @classmethod
     def from_mio(cls, config, op_data, dataset_filename, random_seed=None):
@@ -237,70 +240,42 @@ class Population:
 
     def evaluate(self, target_makespan):
         for individual in self.individuals:
-            individual.makespan, individual.mio_score = individual.evaluate(individual.machine_order)
+            individual.evaluate()
             individual.calculate_fitness(target_makespan)
-        # 스케일링 방법 선택 (Rank Scaling, Sigma Scaling, Boltzmann Scaling)
-        scaling_method = 'min-max'  # 'min-max', 'sigma', 'boltzmann' 등을 사용할 수 있습니다.
-
-        if scaling_method == 'min-max':
-            self.min_max_scaling()
-        elif scaling_method == 'rank':
-            self.rank_scaling()
-        elif scaling_method == 'sigma':
-            self.sigma_scaling()
-        elif scaling_method == 'boltzmann':
-            self.boltzmann_scaling()
-
-    def min_max_scaling(self):
-        fitness_values = [ind.fitness for ind in self.individuals]
-        min_fitness = min(fitness_values)
-        max_fitness = max(fitness_values)
-
-        if max_fitness - min_fitness > 0:
-            for individual in self.individuals:
-                individual.scaled_fitness = (individual.fitness - min_fitness) / (max_fitness - min_fitness)
-        else:
-            for individual in self.individuals:
-                individual.scaled_fitness = 1.0  # In case all fitness values are the same
-
-    def rank_scaling(self):
-        sorted_individuals = sorted(self.individuals, key=lambda ind: ind.fitness, reverse=True)
-        for rank, individual in enumerate(sorted_individuals):
-            individual.scaled_fitness = rank + 1  # 순위를 적합도로 사용
-
-    def sigma_scaling(self):
-        fitness_values = [ind.fitness for ind in self.individuals]
-        mean_fitness = np.mean(fitness_values)
-        std_fitness = np.std(fitness_values)
-        
-        for individual in self.individuals:
-            if std_fitness > 0:
-                individual.scaled_fitness = 1 + (individual.fitness - mean_fitness) / (2 * std_fitness)
-            else:
-                individual.scaled_fitness = 1  # 표준편차가 0인 경우
-
-    def boltzmann_scaling(self, T=1.0):
-        fitness_values = [ind.fitness for ind in self.individuals]
-        exp_values = np.exp(fitness_values / T)
-        sum_exp_values = np.sum(exp_values)
-        
-        for individual in self.individuals:
-            individual.scaled_fitness = exp_values[self.individuals.index(individual)] / sum_exp_values
+        self.individuals.sort(key=lambda x: x.fitness, reverse=True)
 
     def select(self, selection):
-        self.individuals = [selection.select(self.individuals) for _ in range(self.config.population_size)]
+        # print("Selection results:")
+        new_individuals = selection.select(self.individuals)
+        # for i, selected in enumerate(new_individuals):
+        #     print(f"  Selected individual {i}: {selected.seq} (makespan: {selected.makespan})")
+        self.individuals = new_individuals
 
     def crossover(self, crossover):
+        # print("Crossover results:")
         next_generation = []
-        for i in range(0, len(self.individuals), 2):
-            parent1, parent2 = self.individuals[i], self.individuals[i + 1]
-            child1, child2 = crossover.cross(parent1, parent2)
-            next_generation.extend([child1, child2])
+        parents = random.sample(self.individuals, len(self.individuals))  # 부모를 랜덤하게 섞음
+        for i in range(0, len(parents), 2):
+            if i + 1 < len(parents):
+                parent1, parent2 = parents[i], parents[i + 1]
+                child1, child2 = crossover.cross(parent1, parent2)
+                next_generation.extend([child1, child2])
+                # print(f"  Crossover between individuals {self.individuals.index(parent1)} and {self.individuals.index(parent2)}:")
+                # print(f"    Parent 1: {parent1.seq}")
+                # print(f"    Parent 2: {parent2.seq}")
+                # print(f"    Child 1: {child1.seq}")
+                # print(f"    Child 2: {child2.seq}")
         self.individuals = next_generation
 
     def mutate(self, mutation):
-        for individual in self.individuals:
+        # print("Mutation results:")
+        for i, individual in enumerate(self.individuals):
+            original_seq = individual.seq.copy()
             mutation.mutate(individual)
+            # if original_seq != individual.seq:
+            #     print(f"  Mutation on individual {i}:")
+            #     print(f"    Before: {original_seq}")
+            #     print(f"    After:  {individual.seq}")
 
     def preserve_elites(self, elites):
         self.individuals[:len(elites)] = elites

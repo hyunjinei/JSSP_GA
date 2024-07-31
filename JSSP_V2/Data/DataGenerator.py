@@ -25,8 +25,8 @@ def generate_JSSP_data(num_job, num_machine, prefix):
         # 데이터프레임을 파일에 작성
         df.to_csv(f, sep='\t', index=False, header=False, lineterminator='\n')  # Updated lineterminator
 
-num_job = 3
-num_machine = 3
+num_job = 25
+num_machine = 5
 generate_JSSP_data(num_job, num_machine, './Dataset/test_')
 filename = 'test_'+str(num_job) +str(num_machine)+'.txt'
 dataset = Dataset(filename)

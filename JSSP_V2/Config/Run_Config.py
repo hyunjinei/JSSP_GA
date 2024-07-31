@@ -60,3 +60,12 @@ class Run_Config:
             'gantt': os.path.join(self.save_path, f'GA{ga_index}_{self.now}.png'),
             'csv': os.path.join(ga_generations_path, f'GA{ga_index}_{self.now}.csv')  # 추가된 부분
         }
+
+    def set_dataset_filename(self, filename):
+        self.dataset_filename = filename
+        base_filename = os.path.splitext(os.path.basename(filename))[0]
+        self.filename['gantt'] = os.path.join(self.save_path, f'GA{base_filename}_{self.now}.png')
+
+    def update_gantt_filename(self, job_order):
+        order_str = '-'.join(job_order)
+        self.filename['gantt'] = os.path.join(self.save_path, f'GA_{self.now}.png')

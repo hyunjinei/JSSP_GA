@@ -417,12 +417,12 @@ class MultiAgentSystem:
     def load(self, names):
         for agent_id, name in names.items():
             self.agents[agent_id].load(name)
-        self.supervisor.load(names['supervisor'])
+        # self.supervisor.load(names['supervisor'])
 
     def save(self, names):
         for agent_id, name in names.items():
             self.agents[agent_id].save(name)
-        self.supervisor.save(names['supervisor'])
+        # self.supervisor.save(names['supervisor'])
 
     def memory_size(self):
         return sum(agent.memory.n_entries for agent in self.agents.values()) + self.supervisor.memory.n_entries

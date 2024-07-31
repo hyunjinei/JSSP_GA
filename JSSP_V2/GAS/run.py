@@ -7,6 +7,7 @@ import datetime
 from multiprocessing import Pool, Value, Array, Manager, Lock
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# from GAS.run_makespan import calculate_makespan, create_machine_log  # 필요한 모듈 임포트
 
 import pandas as pd
 from GAS.GA import GAEngine
@@ -80,10 +81,67 @@ abz5 = 1234  10, 10
 ft20 = 1165
 '''
 
-TARGET_MAKESPAN = 1642  # 목표 Makespan
+TARGET_MAKESPAN = 0.01  # 목표 Makespan
 MIGRATION_FREQUENCY = 300  # Migration frequency 설정
 random_seed = 42  # Population 초기화시 일정하게 만들기 위함. None을 넣으면 아예 랜덤 생성(GA들끼리 같지않음)
 
+def calculate_makespan(op_data, job_order, num_machines):
+    completion_times = [[0 for _ in range(num_machines)] for _ in range(len(job_order))]
+    
+    for i, job in enumerate(job_order):
+        for j in range(num_machines):
+            machine, processing_time = op_data[job][j]
+            if i == 0 and j == 0:
+                completion_times[i][j] = processing_time
+            elif i == 0:
+                completion_times[i][j] = completion_times[i][j-1] + processing_time
+            elif j == 0:
+                completion_times[i][j] = completion_times[i-1][j] + processing_time
+            else:
+                completion_times[i][j] = max(completion_times[i-1][j], completion_times[i][j-1]) + processing_time
+    
+    # Debugging output
+    print(f"Completion times for job order {job_order}:")
+    for row in completion_times:
+        print(row)
+
+    return completion_times[-1][-1]
+
+
+def create_machine_log(dataset, job_order):
+    num_machines = dataset.n_machine
+    machine_log = []
+    completion_times = [[0 for _ in range(num_machines)] for _ in range(len(job_order))]
+    start_times = [[0 for _ in range(num_machines)] for _ in range(len(job_order))]
+    
+    for i, job in enumerate(job_order):
+        for j in range(num_machines):
+            machine, processing_time = dataset.op_data[job][j]
+            if i == 0 and j == 0:
+                start_time = 0
+            elif i == 0:
+                start_time = completion_times[i][j-1]
+            elif j == 0:
+                start_time = completion_times[i-1][j]
+            else:
+                start_time = max(completion_times[i-1][j], completion_times[i][j-1])
+            
+            start_times[i][j] = start_time
+            completion_times[i][j] = start_time + processing_time
+            
+            machine_log.append({
+                'Job': f'Part{job}',
+                'Machine': f'Machine{machine}',
+                'Start': start_time,
+                'Finish': completion_times[i][j]
+            })
+
+    # Debugging output
+    print(f"Machine log for job order {job_order}:")
+    for log in machine_log:
+        print(log)
+    
+    return pd.DataFrame(machine_log), start_times, completion_times
 
 
 def run_ga_engine(args):
@@ -114,14 +172,7 @@ def run_ga_engine(args):
         machine_log_path = os.path.join(result_txt_path, f'machine_log_GA{index+1}_{now}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_{pso_name}_pc{pc}_pm{pm}.csv')
         generations_path = os.path.join(ga_generations_path, f'ga_generations_GA{index+1}_{now}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_{pso_name}_pc{pc}_pm{pm}.csv')
 
-        if best is not None and hasattr(best, 'monitor'):
-            best.monitor.save_event_tracer(log_path)
-            ga_engine.config.filename['log'] = log_path
-            generated_log_df = generate_machine_log(ga_engine.config)
-            generated_log_df.to_csv(machine_log_path, index=False)
-            ga_engine.save_csv(all_generations, execution_time, generations_path)
-        else:
-            print("No valid best individual or monitor to save the event tracer.")
+        ga_engine.save_csv(all_generations, execution_time, generations_path)
 
         return best, best_crossover, best_mutation, all_generations, execution_time, best_time, index
     except Exception as e:
@@ -137,11 +188,11 @@ def main():
     island_mode = int(input("Select Island-Parallel GA mode (1: Independent, 2: Sequential Migration, 3: Random Migration): "))
     print(f"Selected Island-Parallel GA mode: {island_mode}")
 
-    file = 'ta21.txt'
+    file = 'PBS_5_25_sheet_2.txt'
     print(f"Loading dataset from {file}...")  # 디버그 출력 추가
     dataset = Dataset(file)
 
-    base_config = Run_Config(n_job=20, n_machine=20, n_op=400, population_size=500, generations=100, 
+    base_config = Run_Config(n_job=25, n_machine=5, n_op=125, population_size=100, generations=100, 
                              print_console=False, save_log=True, save_machinelog=True, 
                              show_gantt=False, save_gantt=True, show_gui=False,
                              trace_object='Process4', title='Gantt Chart for JSSP',
@@ -198,9 +249,7 @@ def main():
     '''
 
     custom_settings = [
-        # {'crossover': POXCrossover, 'pc': 0.7, 'mutation': IntelligentMutation, 'pm': 0.05, 'selection': TruncationSelection(),'elite_TS': 0.2, 'local_search': [], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.5, pm_low=0.01, rank_divide=0.4)},
-        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.7, pm_low=0.4, rank_divide=0.05)},
-        {'crossover': OrderCrossover, 'pc': 0.8, 'mutation': InsertionMutation, 'pm': 0.1, 'selection': TournamentSelection(), 'local_search': [], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.8, pm_low=0.1, rank_divide=0.05)},
+        {'crossover': OrderCrossover, 'pc': 1, 'mutation': InversionMutation, 'pm': 0.1, 'selection': RouletteSelection(), 'local_search': [], 'pso':  None, 'selective_mutation': SelectiveMutation(pm_high=0.7, pm_low=0.4, rank_divide=0.05)},
     ]
 
 # (pm_high=0.5, pm_low=0.01, rank_divide=0.4) 기존
@@ -234,7 +283,7 @@ def main():
         pso = pso_class if pso_class else None
         local_search = local_search_methods
         local_search_frequency = 40
-        selective_mutation_frequency = 20
+        selective_mutation_frequency = 200
         selective_mutation = selective_mutation_instance
 
         if initialization_mode == '1':
@@ -321,15 +370,26 @@ def main():
             pso_name = ga_engines[i].pso.__class__.__name__ if ga_engines[i].pso else 'None'
             pc = best_crossover.pc
             pm = best_mutation.pm
-            print(f"Best solution for GA{i+1}: {best} using {crossover_name} with pc={pc} and {mutation_name} with pm={pm} and selection: {selection_name} and Local Search: {local_search_name} and pso: {pso_name}, Time taken: {execution_time:.2f} seconds, First best time: {best_time:.2f} seconds")
-            machine_log_path = os.path.join(result_txt_path, f'machine_log_GA{i+1}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_{pso_name}_pc{pc}_pm{pm}.csv')
+            
+            # 염색체 기반으로 Gantt 차트 생성
+            order = best.seq
+            makespan = calculate_makespan(dataset.op_data, order, dataset.n_machine)
+            machine_log, start_times, completion_times = create_machine_log(dataset, order)
+            config.gantt_title = f"Gantt Chart for GA{i+1} ({'-'.join(map(str, order))})"
             gantt_path = os.path.join(result_gantt_path, f'gantt_chart_GA{i+1}_{crossover_name}_{mutation_name}_{selection_name}_{local_search_name}_{pso_name}_pc{pc}_pm{pm}.png')
-            if os.path.exists(machine_log_path):
-                machine_log = pd.read_csv(machine_log_path)
-                ga_engines[i].config.filename['gantt'] = gantt_path
-                Gantt(machine_log, ga_engines[i].config, best.makespan)
-            else:
-                print(f"Warning: {machine_log_path} does not exist.")
+            config.update_gantt_filename(['GA'+str(i+1)] + list(map(str, order)))
+            Gantt(machine_log, config, makespan)
+            
+            print(f"Best solution for GA{i+1}: {best} using {crossover_name} with pc={pc} and {mutation_name} with pm={pm} and selection: {selection_name} and Local Search: {local_search_name} and pso: {pso_name}, Time taken: {execution_time:.2f} seconds, First best time: {best_time:.2f} seconds")
+            print(f"Machine log for GA{i+1}:")
+            print(machine_log)
+
+
+            # # 각 작업의 시작 시간과 종료 시간 출력
+            # for job_index, job in enumerate(order):
+            #     print(f"Job {job}:")
+            #     for machine_index in range(dataset.n_machine):
+            #         print(f"  M{machine_index+1}: 시작 시간 = {start_times[job_index][machine_index]}, 종료 시간 = {completion_times[job_index][machine_index]}")
 
 if __name__ == "__main__":
     main()
