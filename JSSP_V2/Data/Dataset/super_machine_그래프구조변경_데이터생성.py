@@ -306,7 +306,7 @@ class DDQNAgent:
     def update_epsilon(self, global_episode_count):
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
-        print(f"Epsilon updated: {self.epsilon}")  # 디버깅
+        # print(f"Epsilon updated: {self.epsilon}")  # 디버깅
 
     def replay(self):
         if self.memory.n_entries < self.replay_start_size:
@@ -498,7 +498,7 @@ class DDQNAgent_super:
         self.input_dim = input_dim
         self.action_size = action_size
         self.memory = SumTree_super(10000)
-        self.gamma = 0.9
+        self.gamma = 0
         self.epsilon = 0.99
         self.epsilon_min = 0.001
         self.epsilon_decay = 0.999
@@ -563,7 +563,7 @@ class DDQNAgent_super:
     def update_epsilon(self, global_episode_count):
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
-        print(f"Epsilon updated: {self.epsilon}")  # 디버깅
+        # print(f"Epsilon updated: {self.epsilon}")  # 디버깅
 
     def replay(self):
         if self.memory.n_entries < self.replay_start_size:
@@ -711,7 +711,7 @@ class MultiAgentSystem:
         return total_dim
 
     def calculate_job_input_dim(self, state):
-        machine_features_dim = len(self.graph.get_state_features(f'J_0'))  # get_machine_features를 get_state_features로 변경
+        job_features_dim = len(self.graph.get_state_features(f'J_0'))  # get_machine_features를 get_state_features로 변경
         env_state_dim = (
             1 +  # current_time
             len(state['job_completion']) +
@@ -723,7 +723,7 @@ class MultiAgentSystem:
             sum(len(status) for status in state['job_op_status']) +
             len(state['machine_status'])
         )
-        total_dim = machine_features_dim + env_state_dim
+        total_dim = job_features_dim + env_state_dim
         print(f"Calculated input dimension for machine agents: {total_dim}")  # 디버깅 출력 추가
         return total_dim
 
@@ -741,7 +741,8 @@ class MultiAgentSystem:
             sum(len(status) for status in state['job_op_status']) +
             len(state['machine_status'])
         )
-        total_dim = machine_features + job_features + env_state_length
+        # total_dim = machine_features + job_features + env_state_length
+        total_dim = machine_features + job_features
         # total_dim = job_features + env_state_length
         return total_dim
 
@@ -828,6 +829,7 @@ class MultiAgentSystem:
             *state['machine_status']
         ]
         features = machine_features + job_features + env_features
+        features = machine_features + job_features
         # features = job_features + env_features
        
         return features
@@ -1031,6 +1033,13 @@ def train_individual_models(datasets, num_episodes_per_dataset):
                 machine_features = multi_agent_system.graph.get_machine_features(f'M_{selected_machine}')
                 supervisor_features = multi_agent_system.get_supervisor_features(state)
 
+                multi_agent_system.remember('supervisor', 
+                                            supervisor_features, 
+                                            selected_machine,  # 실제 선택된 machine
+                                            step_reward, 
+                                            multi_agent_system.get_supervisor_features(next_state), 
+                                            done)
+
                 # 실제 선택된 액션 저장
                 multi_agent_system.remember(f'M_{selected_machine}', 
                                             machine_features, 
@@ -1039,12 +1048,6 @@ def train_individual_models(datasets, num_episodes_per_dataset):
                                             multi_agent_system.graph.get_machine_features(f'M_{selected_machine}'), 
                                             done)
 
-                multi_agent_system.remember('supervisor', 
-                                            supervisor_features, 
-                                            selected_machine,  # 실제 선택된 machine
-                                            step_reward, 
-                                            multi_agent_system.get_supervisor_features(next_state), 
-                                            done)
 
                 state = next_state
                 episode_reward += step_reward
@@ -1056,8 +1059,8 @@ def train_individual_models(datasets, num_episodes_per_dataset):
 
                 if done:
                     reward_task, reward_machine = env.calculate_episode_rewards()
-                    # reward_task += episode_reward
-                    # reward_machine += episode_reward
+                    reward_task += episode_reward
+                    reward_machine += episode_reward
                     print(f"Training: Episode {episode+1} processed. Reward Task: {reward_task}, Reward Machine: {reward_machine}, episode reward every step: {episode_reward}")
 
             multi_agent_system.end_episode(state, done, is_training=True)
@@ -1104,7 +1107,7 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
         solution = []
         done = False
         episode_reward = 0
-        multi_agent_system.reset(reset_epsilon=False)
+        multi_agent_system.reset_predict(reset_epsilon=False)
 
         while not done and step_count < max_steps:
             state = env.get_state()
@@ -1139,15 +1142,15 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
 
         if done:
             reward_task, reward_machine = env.calculate_episode_rewards()
-            # reward_task += episode_reward
-            # reward_machine += episode_reward
+            reward_task += episode_reward
+            reward_machine += episode_reward
             print(f"Prediction: Episode {valid_solution_count+1}/{num_predictions} processed. "
                   f"Reward Task: {reward_task}, Reward Machine: {reward_machine}, Episode every step Reward: {episode_reward}")
             valid_solution_count += 1
             all_predictions.append(solution)
             gc.collect()
 
-    multi_agent_system.end_episode(state, done, is_training=False)
+    multi_agent_system.end_episode(state, done, is_training=True)
 
     if valid_solution_count != num_predictions:
         print(f"Warning: Only {valid_solution_count} valid solutions were collected.")
@@ -1157,29 +1160,29 @@ def predict(multi_agent_system, env, test_dataset, num_predictions=1, max_steps=
 
 def main():
     datasets = [
-        # 'fjsspdataset/HurinkEdata7.fjs',
-        'fjssprandom_10_5/dataset_1.fjs',
-        'fjssprandom_10_5/dataset_2.fjs',
-        'fjssprandom_10_5/dataset_3.fjs',
-        'fjssprandom_10_5/dataset_4.fjs', 
-        'fjssprandom_10_5/dataset_5.fjs',
-        'fjssprandom_10_5/dataset_6.fjs',
-        'fjssprandom_10_5/dataset_7.fjs',
-        'fjssprandom_10_5/dataset_8.fjs', 
-        'fjssprandom_10_5/dataset_9.fjs',
-        'fjssprandom_10_5/dataset_10.fjs',
-        'fjssprandom_10_5/dataset_11.fjs',
-        'fjssprandom_10_5/dataset_12.fjs', 
-        'fjssprandom_10_5/dataset_13.fjs',
-        'fjssprandom_10_5/dataset_14.fjs',
-        'fjssprandom_10_5/dataset_15.fjs',
-        'fjssprandom_10_5/dataset_16.fjs', 
-        'fjssprandom_10_5/dataset_17.fjs',
-        'fjssprandom_10_5/dataset_18.fjs',
-        'fjssprandom_10_5/dataset_19.fjs',
-        'fjssprandom_10_5/dataset_20.fjs', 
+        'fjsspdataset/HurinkEdata7.fjs',
+        # 'fjssprandom_10_5/dataset_1.fjs',
+        # 'fjssprandom_10_5/dataset_2.fjs',
+        # 'fjssprandom_10_5/dataset_3.fjs',
+        # 'fjssprandom_10_5/dataset_4.fjs', 
+        # 'fjssprandom_10_5/dataset_5.fjs',
+        # 'fjssprandom_10_5/dataset_6.fjs',
+        # 'fjssprandom_10_5/dataset_7.fjs',
+        # 'fjssprandom_10_5/dataset_8.fjs', 
+        # 'fjssprandom_10_5/dataset_9.fjs',
+        # 'fjssprandom_10_5/dataset_10.fjs',
+        # 'fjssprandom_10_5/dataset_11.fjs',
+        # 'fjssprandom_10_5/dataset_12.fjs', 
+        # 'fjssprandom_10_5/dataset_13.fjs',
+        # 'fjssprandom_10_5/dataset_14.fjs',
+        # 'fjssprandom_10_5/dataset_15.fjs',
+        # 'fjssprandom_10_5/dataset_16.fjs', 
+        # 'fjssprandom_10_5/dataset_17.fjs',
+        # 'fjssprandom_10_5/dataset_18.fjs',
+        # 'fjssprandom_10_5/dataset_19.fjs',
+        # 'fjssprandom_10_5/dataset_20.fjs', 
     ]
-    num_episodes_per_dataset = 50
+    num_episodes_per_dataset = 500
 #abz5
     multi_agent_system, max_state_size, action_size = train_individual_models(datasets, num_episodes_per_dataset)
 
