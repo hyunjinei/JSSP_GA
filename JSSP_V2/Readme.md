@@ -1,4 +1,4 @@
-x# 📊 Hybrid Genetic Algorithm with MIO for Solving JSSP
+# 📊 Hybrid Genetic Algorithm with MIO for Solving JSSP
 
 |                   개발자                   |                 개발자                  |                
 | :--------------------------------------: | :-----------------------------------: | 
